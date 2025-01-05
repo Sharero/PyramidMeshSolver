@@ -30,3 +30,16 @@
 # System files
 .DS_Store
 Thumbs.db
+
+# Python files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+*.egg
+
+# Virtual environments
+env/
+venv/
+
