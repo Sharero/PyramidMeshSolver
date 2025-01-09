@@ -1,188 +1,173 @@
-#include "msg.h"
+#include "../include/msg.h"
 
-void MSG::Initialize(const vector<int>& gi_s, const vector<int>& gj_s, const vector<double>& di_s, const vector<double>& gg_s, const vector<double>& rp_s, int n_s) {
+#include <cmath>
+#include <cstddef>
+#include <vector>
 
-   gi = gi_s;
-   gj = gj_s;
-   di = di_s;
-   gg = gg_s;
-   rp = rp_s;
-   n = n_s;
+void MSG::multiplyMatrixAndVector(const std::vector<double>& f_vector,
+                                  std::vector<double>& x_vector) {
+    for (int i = 0; i < slae_size; i++) {
+        x_vector[i] = di[i] * f_vector[i];
 
-   x0.resize(n);
-   r.resize(n);
-   z.resize(n);
-   p.resize(n);
-   s.resize(n);
-
-   diL.resize(n);
-   ggL.resize(gi[n]);
-
-   for (int i = 0; i < n; i++) {
-
-      diL[i] = di[i];
-      x0[i] = 0;
-   }
-
-   for (int i = 0; i < gi[n]; i++)
-      ggL[i] = gg[i];
+#pragma unroll 4
+        for (int k = gi[i], k1 = gi[i + 1]; k < k1; k++) {
+            x_vector[i] += gg[k] * f_vector[gj[k]];
+            x_vector[gj[k]] += gg[k] * f_vector[i];
+        }
+    }
 }
 
-void MSG::Ax(const vector<double>& f, vector<double>& x) {
-
-   for (int i = 0; i < n; i++) {
-
-      x[i] = di[i] * f[i];
-
-      for (int k = gi[i], k1 = gi[i + 1]; k < k1; k++) {
-
-         int j = gj[k];
-         x[i] += gg[k] * f[j];
-         x[j] += gg[k] * f[i];
-      }
-   }
+void MSG::calculateLLT(const std::vector<double>& f_vector,
+                       std::vector<double>& x_vector) {
+    calculateL(f_vector, x_vector);
+    calculateLT(x_vector, x_vector);
 }
 
-void MSG::CalculateLLT(const vector<double>& f, vector<double>& x) {
+void MSG::calculateLT(const std::vector<double>& f_vector,
+                      std::vector<double>& x_vector) {
+    std::vector<double> f_vector_copy = f_vector;
 
-   CalculateL(f, x);
-   CalculateLT(x, x);
+    for (std::size_t k = slae_size, k1 = slae_size - 1; k > 0; k--, k1--) {
+        x_vector[k1] = f_vector_copy[k1] / di_of_lower_triangle[k1];
+
+#pragma unroll 4
+        for (int i = gi[k1]; i < gi[k]; i++) {
+            f_vector_copy[gj[i]] -= gg_of_lower_triangle[i] * x_vector[k1];
+        }
+    }
 }
 
-void MSG::CalculateLT(const vector<double>& f, vector<double>& x) {
+void MSG::calculateL(const std::vector<double>& f_vector,
+                     std::vector<double>& x_vector) {
+    for (int k = 1, k1 = 0; k <= slae_size; k++, k1++) {
+        double sum = 0.0;
 
-   vector<double> temp = f;
+#pragma unroll 4
+        for (int i = gi[k1]; i < gi[k]; i++) {
+            sum += gg_of_lower_triangle[i] * x_vector[gj[i]];
+        }
 
-   for (int k = n, k1 = n - 1; k > 0; k--, k1--) {
-
-      x[k1] = temp[k1] / diL[k1];
-
-      for (int i = gi[k1]; i < gi[k]; i++)
-         temp[gj[i]] -= ggL[i] * x[k1];
-   }
+        x_vector[k1] = (f_vector[k1] - sum) / di_of_lower_triangle[k1];
+    }
 }
 
-void MSG::CalculateL(const vector<double>& f, vector<double>& x) {
+void MSG::makeLLTDecomposition() {
+    double diagonal_sum = 0.0;
+    double lower_triangle_sum = 0.0;
 
-   for (int k = 1, k1 = 0; k <= n; k++, k1++) {
+    for (int k = 0; k < slae_size; k++) {
+        diagonal_sum = 0;
 
-      double sum = 0;
+        const int row_start_index = gi[k];
+        const int row_end_index = gi[k + 1];
 
-      for (int i = gi[k1]; i < gi[k]; i++)
-         sum += ggL[i] * x[gj[i]];
+        for (int i = row_start_index; i < row_end_index; i++) {
+            lower_triangle_sum = 0;
 
-      x[k1] = (f[k1] - sum) / diL[k1];
-   }
-}
+            int column_start_index = gi[gj[i]];
+            const int column_end_index = gi[gj[i] + 1];
 
-void MSG::MakeLLTDecomposition() {
-
-   double sumD;
-   double sumL;
-
-   for (int k = 0; k < n; k++) {
-
-      sumD = 0;
-
-      int iStartIndex = gi[k];
-      int iEndIndex = gi[k + 1];
-
-      for (int i = iStartIndex; i < iEndIndex; i++) {
-
-         sumL = 0;
-
-         int jStartIndex = gi[gj[i]];
-         int jEndIndex = gi[gj[i] + 1];
-
-         for (int m = iStartIndex; m < i; m++) {
-
-            for (int j = jStartIndex; j < jEndIndex; j++) {
-
-               if (gj[m] == gj[j]) {
-
-                  sumL += ggL[m] * ggL[j];
-                  jStartIndex++;
-               }
+            for (int current_row_index = row_start_index; current_row_index < i;
+                 current_row_index++) {
+#pragma unroll 4
+                for (int j = column_start_index; j < column_end_index; j++) {
+                    if (gj[current_row_index] == gj[j]) {
+                        lower_triangle_sum +=
+                            gg_of_lower_triangle[current_row_index] *
+                            gg_of_lower_triangle[j];
+                        column_start_index++;
+                    }
+                }
             }
-         }
 
-         ggL[i] = (ggL[i] - sumL) / diL[gj[i]];
+            gg_of_lower_triangle[i] =
+                (gg_of_lower_triangle[i] - lower_triangle_sum) /
+                di_of_lower_triangle[gj[i]];
 
-         sumD += ggL[i] * ggL[i];
-      }
+            diagonal_sum += gg_of_lower_triangle[i] * gg_of_lower_triangle[i];
+        }
 
-      diL[k] = sqrt(diL[k] - sumD);
-   }
+        di_of_lower_triangle[k] = sqrt(di_of_lower_triangle[k] - diagonal_sum);
+    }
 }
 
-void MSG::Calculate(vector<double>& solution) {
+void MSG::calculateSLAE(std::vector<double>& solution) {
+    int const maximum_iterations = 1000;
+    double const epsilon = 1E-15;
 
-   int maximumIterations = 1000;
-   
-   bool end = false;
+    bool end = false;
 
-   double epsilon = 1E-15;
-   double discrepansy;
-   double rpNorm;
-   double scalar1;
-   double scalar2;
-   double betta;
-   double alpha;
+    double discrepansy = 0.0;
+    double rp_norm = 0.0;
+    double scalar1 = 0.0;
+    double scalar2 = 0.0;
+    double betta = 0.0;
+    double alpha = 0.0;
 
-   Ax(x0, r);
+    multiplyMatrixAndVector(x0, r);
 
-   for (int i = 0; i < n; i++)
-      r[i] = rp[i] - r[i];
+#pragma unroll 4
+    for (int i = 0; i < slae_size; i++) {
+        r[i] = rp[i] - r[i];
+    }
 
-   MakeLLTDecomposition();
-   CalculateLLT(r, z);
+    makeLLTDecomposition();
+    calculateLLT(r, z);
 
-   for (int i = 0; i < n; i++)
-      p[i] = z[i];
+#pragma unroll 4
+    for (int i = 0; i < slae_size; i++) {
+        p[i] = z[i];
+    }
 
-   rpNorm = sqrt(Scalar(rp, rp));
-   scalar1 = Scalar(p, r);
+    rp_norm = sqrt(calculateScalarProduct(rp, rp));
+    scalar1 = calculateScalarProduct(p, r);
 
-   for (int iter = 0; iter < maximumIterations && !end; iter++) {
+    for (int current_iteration = 0;
+         current_iteration < maximum_iterations && !end; current_iteration++) {
+        discrepansy = sqrt(calculateScalarProduct(r, r));
 
-      discrepansy = sqrt(Scalar(r, r));
+        if (epsilon < discrepansy / rp_norm) {
+            multiplyMatrixAndVector(z, s);
 
-      if (epsilon < discrepansy / rpNorm) {
+            alpha = scalar1 / calculateScalarProduct(s, z);
 
-         Ax(z, s);
+#pragma unroll 4
+            for (int i = 0; i < slae_size; i++) {
+                x0[i] += alpha * z[i];
+                r[i] -= alpha * s[i];
+            }
 
-         alpha = scalar1 / Scalar(s, z);
+            calculateLLT(r, p);
+            scalar2 = calculateScalarProduct(p, r);
 
-         for (int i = 0; i < n; i++) {
+            betta = scalar2 / scalar1;
 
-            x0[i] += alpha * z[i];
-            r[i] -= alpha * s[i];
-         }
+            scalar1 = scalar2;
 
-         CalculateLLT(r, p);
-         scalar2 = Scalar(p, r);
+#pragma unroll 4
+            for (int i = 0; i < slae_size; i++) {
+                z[i] = p[i] + betta * z[i];
+            }
+        } else {
+            end = true;
+        }
+    }
 
-         betta = scalar2 / scalar1;
-
-         scalar1 = scalar2;
-
-         for (int i = 0; i < n; i++)
-            z[i] = p[i] + betta * z[i];
-      }
-      else
-         end = true;
-   }
-
-   for (int i = 0; i < n; i++)
-      solution[i] = x0[i];
+#pragma unroll 4
+    for (int i = 0; i < slae_size; i++) {
+        solution[i] = x0[i];
+    }
 }
 
-double MSG::Scalar(const vector<double>& a, const vector<double>& b) {
+double MSG::calculateScalarProduct(
+    const std::vector<double>& first_vector,
+    const std::vector<double>& second_vector) const {
+    double scalar = 0.0;
 
-   double scalar = 0;
+#pragma unroll 4
+    for (int i = 0; i < slae_size; i++) {
+        scalar += first_vector[i] * second_vector[i];
+    }
 
-   for (int i = 0; i < n; i++)
-      scalar += a[i] * b[i];
-
-   return scalar;
+    return scalar;
 }

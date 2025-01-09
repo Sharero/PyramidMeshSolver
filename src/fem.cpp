@@ -1,261 +1,281 @@
-#include "fem.h"
+#include "../include/fem.h"
 
-double fFunction(double x, double y, double z) {
+#include <cmath>
+#include <cstddef>
+#include <filesystem>
+#include <fstream>
+#include <iomanip>
+#include <iostream>
+#include <set>
+#include <string_view>
+#include <tuple>
+#include <vector>
 
-    // return 5;
-    // return x + y + z;
-    return -6 + pow(x, 2) + pow(y, 2) + pow(z, 2);
-    // return -6 * (x + y + z) + pow(x, 3) + pow(y, 3) + pow(z, 3);
-    // return sin(x * y * z) * (1 + pow(x * y, 2) + pow(x * z, 2) + pow(y * z, 2));
+#include "../include/grid.h"
+
+const double TETRAHEDRON_VOLUME_DIVISOR = 6.0;
+const double INTEGRAL_NORMALIZATION_FACTOR = 0.5;
+
+double FEM::calculateF(Point point) {
+    const double const_right_part = 5.0;
+    const double quadratic_div_grad = -6.0;
+
+    // return const_right_part + 0 * (point.x + point.y + point.z);
+    return point.x + point.y + point.z;
+    // return quadratic_div_grad + pow(point.x, 2) + pow(point.y, 2) +
+    //        pow(point.z, 2);
 }
-double FEM::UFunction(Point point) {
 
-    // return 5;
-    // return point.x + point.y + point.z;
-    return pow(point.x, 2) + pow(point.y, 2) + pow(point.z, 2);
+double FEM::calculateU(Point point) {
+    const double const_right_part = 5.0;
+
+    // return const_right_part + 0 * (point.x + point.y + point.z);
+    return point.x + point.y + point.z;
+    // return pow(point.x, 2) + pow(point.y, 2) + pow(point.z, 2);
     // return pow(point.x, 3) + pow(point.y, 3) + pow(point.z, 3);
     // return sin(point.x * point.y * point.z);
 }
 
-void FEM::GenerateLinearData(string inputFileName) {
+void FEM::printTestResults(const std::vector<Point>& test_points) {
+    int const first_column_step = 10;
+    int const second_column_step = 15;
+    int const third_column_step = 20;
 
+    int const numbers_in_float = 6;
+
+    std::cout << std::setw(first_column_step) << "u"
+              << std::setw(second_column_step) << "u*"
+              << std::setw(third_column_step) << "|u - u*|" << '\n';
+
+    std::cout << std::fixed << std::setprecision(numbers_in_float);
+
+#pragma unroll 4
+    for (const auto& point : test_points) {
+        double const true_result = calculateU(point);
+        double const result = getResultAtPoint(point);
+
+        std::cout << std::setw(first_column_step) << result
+                  << std::setw(second_column_step) << true_result
+                  << std::setw(third_column_step)
+                  << std::abs(true_result - result) << '\n';
+    }
+}
+
+void FEM::generateLinearData(std::string_view const& input_file_name) {
     nodes.resize(9);
-    finiteElements.resize(6);
+    finite_elements.resize(6);
 
-    nodes[0] = {0,0,0};
-    nodes[1] = {1,0,0};
-    nodes[2] = {0,1,0};
-    nodes[3] = {1,1,0};
-    nodes[4] = {0,0,1};
-    nodes[5] = {1,0,1};
-    nodes[6] = {0,1,1};
-    nodes[7] = {1,1,1};
-    nodes[8] = {0.5,0.5,0.5};
+    nodes[0] = {0, 0, 0};
+    nodes[1] = {1, 0, 0};
+    nodes[2] = {0, 1, 0};
+    nodes[3] = {1, 1, 0};
+    nodes[4] = {0, 0, 1};
+    nodes[5] = {1, 0, 1};
+    nodes[6] = {0, 1, 1};
+    nodes[7] = {1, 1, 1};
+    nodes[8] = {0.5, 0.5, 0.5};
 
-    finiteElements[0] = {0, 1, 4, 5, 8};
-    finiteElements[1] = {0, 2, 4, 6, 8};
-    finiteElements[2] = {1, 3, 5, 7, 8};
-    finiteElements[3] = {2, 3, 6, 7, 8};
-    finiteElements[4] = {0, 1, 2, 3, 8};
-    finiteElements[5] = {4, 5, 6, 7, 8};
+    finite_elements[0] = {0, 1, 4, 5, 8};
+    finite_elements[1] = {0, 2, 4, 6, 8};
+    finite_elements[2] = {1, 3, 5, 7, 8};
+    finite_elements[3] = {2, 3, 6, 7, 8};
+    finite_elements[4] = {0, 1, 2, 3, 8};
+    finite_elements[5] = {4, 5, 6, 7, 8};
 
-    // grid.GenerateGrid(inputFileName);
+    // std::filesystem::path const file_name = input_file_name;
+
+    // grid.generateGrid(file_name);
 
     // for (size_t j = 0; j < grid.countY; j++) {
 
     //     for (size_t k = 0; k < grid.countX; k++) {
 
-    //         nodes.push_back({grid.gridX[k], grid.gridY[j], grid.gridZ[0]});
+    //         nodes.push_back({grid.grid_x[k], grid.grid_y[j],
+    //         grid.grid_z[0]});
     //     }
     // }
 
-    // for (size_t i = 1; i < grid.countZ; i++) {
+    // for (size_t i = 1; i < grid.count_z; i++) {
 
-    //     double scale = 1 - (grid.gridZ[i] / grid.pyramidHeight.z);
+    //     double scale = 1 - (grid.grid_z[i] / grid.pyramidHeight.z);
 
     //     for (size_t j = 0; j < grid.countY * grid.countX; j++) {
-            
-    //         double x = nodes[j].x + (grid.pyramidHeight.x - nodes[j].x) * (grid.gridZ[i] / grid.pyramidHeight.z);
-    //         double y = nodes[j].y + (grid.pyramidHeight.y - nodes[j].y) * (grid.gridZ[i] / grid.pyramidHeight.z);
 
-    //         nodes.push_back({x, y, grid.gridZ[i]});
-    //     }   
+    //         double x = nodes[j].x + (grid.pyramidHeight.x - nodes[j].x) *
+    //         (grid.grid_z[i] / grid.pyramidHeight.z); double y = nodes[j].y +
+    //         (grid.pyramidHeight.y - nodes[j].y) * (grid.grid_z[i] /
+    //         grid.pyramidHeight.z);
+
+    //         nodes.push_back({x, y, grid.grid_z[i]});
+    //     }
     // }
-    
+
     // nodes.push_back(grid.pyramidHeight);
 
     // int apexIndex = nodes.size() - 1;
 
-    // for (size_t k = 0; k < grid.countZ; k++) {
+    // for (size_t k = 0; k < grid.count_z; k++) {
 
     //     for (int i = 0; i < grid.countX - 1; ++i) {
 
     //         for (int j = 0; j < grid.countY - 1; ++j) {
 
-    //             int idx1 = i * grid.countX + j + k * grid.countX * grid.countY;
-    //             int idx2 = idx1 + 1;
-    //             int idx3 = (i + 1) * grid.countX + j + k * grid.countX * grid.countY;
-    //             int idx4 = idx3 + 1;
+    //             int idx1 = i * grid.countX + j + k * grid.countX *
+    //             grid.countY; int idx2 = idx1 + 1; int idx3 = (i + 1) *
+    //             grid.countX + j + k * grid.countX * grid.countY; int idx4 =
+    //             idx3 + 1;
 
-    //             finiteElements.push_back({idx1, idx2, idx3, idx4, apexIndex});
+    //             finiteElements.push_back({idx1, idx2, idx3, idx4,
+    //             apexIndex});
     //         }
     //     }
     // }
 
-    nodesCount = nodes.size();
-    finiteElementsCount = finiteElements.size();
-    stiffnessMatrixLocal.resize(5,vector<double>(5));
-    massMatrixLocal.resize(5,vector<double>(5));
-    rightPartLocal.resize(5);
+    nodes_count = nodes.size();
+
+    finite_elements_count = finite_elements.size();
+
+    stiffness_matrix_local.resize(
+        NUMBER_OF_VERTICES_OF_PYRAMID,
+        std::vector<double>(NUMBER_OF_VERTICES_OF_PYRAMID));
+
+    mass_matrix_local.resize(
+        NUMBER_OF_VERTICES_OF_PYRAMID,
+        std::vector<double>(NUMBER_OF_VERTICES_OF_PYRAMID));
+
+    right_part_local.resize(NUMBER_OF_VERTICES_OF_PYRAMID);
 }
 
-void FEM::InputBoundaryConditions(string inputFileName) {
-
-    int countFirstConditionNodes;
+void FEM::inputBoundaryConditions(std::string_view const& input_file_name) {
+    int count_first_condition_nodes = 0;
+    std::filesystem::path const file_name = input_file_name;
 
     {
-        ifstream inputBoundaries(inputFileName);
+        std::ifstream input_boundaries(file_name);
 
-        inputBoundaries >> countFirstConditionNodes;
+        input_boundaries >> count_first_condition_nodes;
 
-        firstBoundaryConditionNodes.resize(countFirstConditionNodes);
+        first_boundary_condition_nodes.resize(count_first_condition_nodes);
 
-        for (int i = 0; i < countFirstConditionNodes; i++) {
-            
-            inputBoundaries >> firstBoundaryConditionNodes[i];
+#pragma unroll 4
+        for (int i = 0; i < count_first_condition_nodes; i++) {
+            input_boundaries >> first_boundary_condition_nodes[i].first;
+            first_boundary_condition_nodes[i].second =
+                calculateU(nodes[first_boundary_condition_nodes[i].first]);
         }
     }
 }
 
-void FEM::GenerateMatrixPortrait() {
+void FEM::generatePortrait() {
+    std::size_t lower_triangle_size = 0;
 
-    int ggSize = 0;
-    int tmp = 0;
+    std::vector<std::set<int>> connections(nodes_count);
 
-    slae.n = nodesCount;
-
-    vector<set<int>> connections(nodesCount);
-
-    for (int i = 0; i < finiteElementsCount; i++)
-        for (int j = 0; j < 5; j++)
-            for (int k = 0; k < j; k++)
-                connections[finiteElements[i].nodeIndexes[k]].insert(finiteElements[i].nodeIndexes[j]);
-    
-    for (int i = 0; i < nodesCount; i++) {
-
-        ggSize += connections[i].size();
-    }
-
-    slae.AllocateMemory(ggSize);
-
-    slae.ig[0] = 0;
-
-    for (int i = 0; i < slae.n; i++) {
-
-        int k = 0;
-        for (int j = 0; j <= i; j++) {
-
-            if (count(connections[j].begin(), connections[j].end(), i)) {
-
-                slae.jg[tmp] = j;
-                tmp++;
-                k++;
-            }
-        }
-
-        slae.ig[i + 1] = slae.ig[i] + k;
-    }    
-}
-
-void FEM::GenerateLocalMatrix(int finiteElementNumber) {
-
-    for (size_t i = 0; i < 5; i++) {
-
-        for (size_t j = 0; j < 5; j++) {
-
-            stiffnessMatrixLocal[i][j] = lambda * IntegrateDerivativeBasisFunctions(finiteElementNumber,i,j);
-            massMatrixLocal[i][j] = gamma * IntegrateBasisFunctions(finiteElementNumber,i,j);
-        }    
-    }
-
-    for (size_t i = 0; i < 5; i++) {
-
-        rightPartLocal[i] = IntegrateBasisFunctionForF(finiteElementNumber,i);
-    }
-}
-
-void FEM::AssemblyGlobalMatrix() {
-
-    for (int i = 0; i < finiteElementsCount; i++) {
-
-        GenerateLocalMatrix(i);
-
-        for (int j = 0; j < 5; j++) {
-
+    for (int i = 0; i < finite_elements_count; i++) {
+        for (int j = 0; j < NUMBER_OF_VERTICES_OF_PYRAMID; j++) {
+#pragma unroll 4
             for (int k = 0; k < j; k++) {
-
-                double a = massMatrixLocal[j][k] + stiffnessMatrixLocal[j][k];
-
-                if (finiteElements[i].nodeIndexes[j] > finiteElements[i].nodeIndexes[k])
-                    slae.AddElement(finiteElements[i].nodeIndexes[j], finiteElements[i].nodeIndexes[k], a);
-                else
-                    slae.AddElement(finiteElements[i].nodeIndexes[k], finiteElements[i].nodeIndexes[j], a);
+                const auto node_indexes = finite_elements[i].getNodeIndexes();
+                connections[node_indexes.at(k)].insert(node_indexes.at(j));
             }
-
-            slae.di[finiteElements[i].nodeIndexes[j]] += massMatrixLocal[j][j] + stiffnessMatrixLocal[j][j];
-            slae.f[finiteElements[i].nodeIndexes[j]] += rightPartLocal[j];
         }
+    }
+
+#pragma unroll 4
+    for (int i = 0; i < nodes_count; i++) {
+        lower_triangle_size += connections[i].size();
+    }
+
+    slae.setSlaeSize(nodes_count);
+
+    slae.allocateMemory(lower_triangle_size);
+
+    slae.setIndexArrays(connections);
+}
+
+void FEM::calculateLocalComponents(int index_of_finite_element) {
+    for (int i = 0; i < NUMBER_OF_VERTICES_OF_PYRAMID; i++) {
+#pragma unroll 4
+        for (int j = 0; j < NUMBER_OF_VERTICES_OF_PYRAMID; j++) {
+            stiffness_matrix_local[i][j] =
+                lambda * integrateDerivativeBasisFunctions(
+                             std::make_tuple(index_of_finite_element, i, j));
+
+            mass_matrix_local[i][j] =
+                gamma * integrateBasisFunctions(
+                            std::make_tuple(index_of_finite_element, i, j));
+        }
+    }
+
+#pragma unroll 4
+    for (int i = 0; i < NUMBER_OF_VERTICES_OF_PYRAMID; i++) {
+        right_part_local[i] = integrateBasisFunctionForF(
+            std::make_tuple(index_of_finite_element, i));
     }
 }
 
-void FEM::ApplyFirstBoundaryConditions() {
+void FEM::assemblyGlobalComponents() {
+    for (int i = 0; i < finite_elements_count; i++) {
+        calculateLocalComponents(i);
 
-    for (const auto& node : firstBoundaryConditionNodes) {
+        auto const node_indexes = finite_elements[i].getNodeIndexes();
 
-        slae.di[node] = 1.;
-        slae.f[node] = UFunction(nodes[node]);
+        for (int j = 0; j < NUMBER_OF_VERTICES_OF_PYRAMID; j++) {
+#pragma unroll 4
+            for (int k = 0; k < j; k++) {
+                double const lower_triangle_element =
+                    mass_matrix_local[j][k] + stiffness_matrix_local[j][k];
 
-        int startIndex = slae.ig[node];
-        int endIndex = slae.ig[node + 1];
-
-        for (int i = startIndex; i < endIndex; i++) {
-
-            slae.f[slae.jg[i]] -= slae.gg[i] * UFunction(nodes[node]);
-            slae.gg[i] = 0.;
-        }
-
-        for (int p = node + 1; p < nodesCount; p++) {
-
-            int startIndex = slae.ig[p];
-            int endIndex = slae.ig[p + 1];
-
-            for (int i = startIndex; i < endIndex; i++) {
-
-                if (slae.jg[i] == node) {
-
-                    slae.f[p] -= slae.gg[i] * UFunction(nodes[node]);
-                    slae.gg[i] = 0.;
+                if (node_indexes.at(j) > node_indexes.at(k)) {
+                    slae.addLowerTriangleElement(
+                        std::make_tuple(node_indexes.at(j), node_indexes.at(k),
+                                        lower_triangle_element));
+                } else {
+                    slae.addLowerTriangleElement(
+                        std::make_tuple(node_indexes.at(k), node_indexes.at(j),
+                                        lower_triangle_element));
                 }
             }
+
+            slae.addDiagonalElement(
+                node_indexes.at(j),
+                mass_matrix_local[j][j] + stiffness_matrix_local[j][j]);
+
+            slae.addRightPartElement(node_indexes.at(j), right_part_local[j]);
         }
     }
 }
 
-void FEM::SolveFEM() {
-
-    ApplyFirstBoundaryConditions();
-    slae.Solve();        
+void FEM::solveFEM() {
+    slae.applyFirstBoundaryConditions(first_boundary_condition_nodes);
+    slae.solveSLAE();
 }
 
-void FEM::SaveGridForVisualize() {
+void FEM::saveGridForVisualize() {
+    std::ofstream out_nodes("data/nodes.txt");
 
-    ofstream outNodes("data/nodes.txt");
-
+#pragma unroll 4
     for (auto& node : nodes) {
-
-        outNodes << node.x << " " << node.y << " " << node.z << endl;
+        out_nodes << node.x << " " << node.y << " " << node.z << '\n';
     }
 
-    ofstream outElements("data/elements.txt");
+    std::ofstream out_elements("data/elements.txt");
 
-    for (auto& element : finiteElements) {
-
-        outElements << element.nodeIndexes[0] << " " 
-                    << element.nodeIndexes[1] << " " 
-                    << element.nodeIndexes[2] << " "
-                    << element.nodeIndexes[3] << " "
-                    << element.nodeIndexes[4] << endl;
+#pragma unroll 4
+    for (auto& element : finite_elements) {
+        const auto node_indexes = element.getNodeIndexes();
+        out_elements << node_indexes.at(0) << " " << node_indexes.at(1) << " "
+                     << node_indexes.at(2) << " " << node_indexes.at(3) << " "
+                     << node_indexes.at(4) << '\n';
     }
 }
 
-int FEM::GetFiniteElement(Point point) {
-
+int FEM::getFiniteElementIndex(Point point) {
     int position = -1;
 
-    for (size_t i = 0; i < finiteElements.size(); ++i) {
-
-        if (IsPointInPyramid(point, finiteElements[i])) {
-
+#pragma unroll 4
+    for (int i = 0; i < finite_elements.size(); ++i) {
+        if (isPointInPyramid(point, finite_elements[i])) {
             position = i;
         }
     }
@@ -263,353 +283,595 @@ int FEM::GetFiniteElement(Point point) {
     return position;
 }
 
-void FEM::CrossProduct(Point v1, Point v2, Point v3) {
-    v3.x = v1.y * v2.z - v1.z * v2.y;
-    v3.y = v1.z * v2.x - v1.x * v2.z;
-    v3.z = v1.x * v2.y - v1.y * v2.x;
+Point FEM::calculateVectorCrossProduct(Point first_vector,
+                                       Point second_vector) {
+    Point cross_product_result = {
+        first_vector.y * second_vector.z - first_vector.z * second_vector.y,
+        first_vector.z * second_vector.x - first_vector.x * second_vector.z,
+        first_vector.x * second_vector.y - first_vector.y * second_vector.x};
+
+    return cross_product_result;
 }
-bool FEM::IsPointInPyramid(const Point& point, const Element& element) {
 
-    Point a = nodes[element.nodeIndexes[0]], 
-    b = nodes[element.nodeIndexes[1]], 
-    c = nodes[element.nodeIndexes[2]], 
-    d = nodes[element.nodeIndexes[3]], 
-    e = nodes[element.nodeIndexes[4]];
+bool FEM::isPointInPyramid(const Point& point, const Element& element) {
+    const auto node_indexes = element.getNodeIndexes();
 
-    if (IsPointInsideTetrahedron(point, a, b, c, e)) return true;
+    Point const first_point_of_pyramid = nodes[node_indexes.at(0)];
+    Point const second_point_of_pyramid = nodes[node_indexes.at(1)];
+    Point const third_point_of_pyramid = nodes[node_indexes.at(2)];
+    Point const fourth_point_of_pyramid = nodes[node_indexes.at(3)];
+    Point const fifth_point_of_pyramid = nodes[node_indexes.at(4)];
 
-    if (IsPointInsideTetrahedron(point, a, c, d, e)) return true;
+    if (isPointInsideTetrahedron(
+            point, first_point_of_pyramid, second_point_of_pyramid,
+            third_point_of_pyramid, fifth_point_of_pyramid)) {
+        return true;
+    }
+
+    if (isPointInsideTetrahedron(
+            point, first_point_of_pyramid, third_point_of_pyramid,
+            fourth_point_of_pyramid, fifth_point_of_pyramid)) {
+        return true;
+    }
 
     return false;
 }
-double FEM::CalculateTetrahedronVolume(Point p1, Point p2, Point p3, Point p4) {
-    Point v1 = {p2.x - p1.x, p2.y - p1.y, p2.z - p1.z};
-    Point v2 = {p3.x - p1.x, p3.y - p1.y, p3.z - p1.z};
-    Point v3 = {p4.x - p1.x, p4.y - p1.y, p4.z - p1.z};
 
-    Point cross;
-    CrossProduct(v2,v3,cross);
+double FEM::calculateTetrahedronVolume(Point first_tetrahedron_point,
+                                       Point second_tetrahedron_point,
+                                       Point third_tetrahedron_point,
+                                       Point fourth_tetrahedron_point) {
+    Point const vertice_1 = {
+        second_tetrahedron_point.x - first_tetrahedron_point.x,
+        second_tetrahedron_point.y - first_tetrahedron_point.y,
+        second_tetrahedron_point.z - first_tetrahedron_point.z};
 
-    double scalar = v1.x * cross.x + v1.y * cross.y + v1.z * cross.z;
-    return std::abs(scalar) / 6.0;
+    Point const vertice_2 = {
+        third_tetrahedron_point.x - first_tetrahedron_point.x,
+        third_tetrahedron_point.y - first_tetrahedron_point.y,
+        third_tetrahedron_point.z - first_tetrahedron_point.z};
+
+    Point const vertice_3 = {
+        fourth_tetrahedron_point.x - first_tetrahedron_point.x,
+        fourth_tetrahedron_point.y - first_tetrahedron_point.y,
+        fourth_tetrahedron_point.z - first_tetrahedron_point.z};
+
+    Point const cross = calculateVectorCrossProduct(vertice_2, vertice_3);
+
+    return std::abs(vertice_1.x * cross.x + vertice_1.y * cross.y +
+                    vertice_1.z * cross.z) /
+           TETRAHEDRON_VOLUME_DIVISOR;
 }
-bool FEM::IsPointInsideTetrahedron(Point point, Point a, Point b, Point c, Point d) {
-    double volumeTotal = CalculateTetrahedronVolume(a, b, c, d);
-    double v1 = CalculateTetrahedronVolume(point, b, c, d);
-    double v2 = CalculateTetrahedronVolume(a, point, c, d);
-    double v3 = CalculateTetrahedronVolume(a, b, point, d);
-    double v4 = CalculateTetrahedronVolume(a, b, c, point);
-    double sumOfVolumes = v1 + v2 + v3 + v4;
-    double difference = std::abs(sumOfVolumes - volumeTotal);
-    return difference < 0.00001;
 
+bool FEM::isPointInsideTetrahedron(Point point, Point first_tetrahedron_point,
+                                   Point second_tetrahedron_point,
+                                   Point third_tetrahedron_point,
+                                   Point fourth_tetrahedron_point) {
+    const double epsilon = 0.00001;
+
+    double const total_tetrahedron_volume = calculateTetrahedronVolume(
+        first_tetrahedron_point, second_tetrahedron_point,
+        third_tetrahedron_point, fourth_tetrahedron_point);
+
+    double const first_tetrahedron_volume = calculateTetrahedronVolume(
+        point, second_tetrahedron_point, third_tetrahedron_point,
+        fourth_tetrahedron_point);
+
+    double const second_tetrahedron_volume = calculateTetrahedronVolume(
+        first_tetrahedron_point, point, third_tetrahedron_point,
+        fourth_tetrahedron_point);
+
+    double const third_tetrahedron_volume = calculateTetrahedronVolume(
+        first_tetrahedron_point, second_tetrahedron_point, point,
+        fourth_tetrahedron_point);
+
+    double const fourth_tetrahedron_volume = calculateTetrahedronVolume(
+        first_tetrahedron_point, second_tetrahedron_point,
+        third_tetrahedron_point, point);
+
+    double const difference =
+        std::abs(first_tetrahedron_volume + second_tetrahedron_volume +
+                 third_tetrahedron_volume + fourth_tetrahedron_volume -
+                 total_tetrahedron_volume);
+
+    return difference < epsilon;
 }
 
-double FEM::GetResultAtPoint(Point point) {
+double FEM::getResultAtPoint(Point point) {
+    double result = 0.0;
 
-    double result = 0.;
-    int finiteElementIndex = GetFiniteElement(point);
+    int const finite_element_index = getFiniteElementIndex(point);
 
-    for (int i = 0; i < 5; i++)
-        result += slae.q[finiteElements[finiteElementIndex].nodeIndexes[i]] * 
-        GetLinearBasisFunctionTest(point, nodes[finiteElements[finiteElementIndex].nodeIndexes[0]]
-        , nodes[finiteElements[finiteElementIndex].nodeIndexes[1]]
-        , nodes[finiteElements[finiteElementIndex].nodeIndexes[2]]
-        , nodes[finiteElements[finiteElementIndex].nodeIndexes[3]], i);
+    const auto slae_result = slae.getResultVector();
+
+    const auto node_indexes =
+        finite_elements[finite_element_index].getNodeIndexes();
+
+#pragma unroll 4
+    for (int i = 0; i < NUMBER_OF_VERTICES_OF_PYRAMID; i++) {
+        result += slae_result[node_indexes.at(i)] *
+                  getLinearBasisFunctionTest(point, nodes[node_indexes.at(0)],
+                                             nodes[node_indexes.at(1)],
+                                             nodes[node_indexes.at(2)],
+                                             nodes[node_indexes.at(3)], i);
+    }
 
     return result;
 }
 
-double FEM::GetLinearBasisFunctionTest(Point point, Point node0, Point node1, Point node2, Point node3, int numberBasisFunction) {
-    
-    Point vertex = {0.5,0.5,0.5};
+double FEM::getLinearBasisFunctionTest(Point point, Point node_0, Point node_1,
+                                       Point node_2, Point node_3,
+                                       int number_basis_function) {
+    Point const vertex = {0.5, 0.5, 0.5};
 
-    Point baseCenter;
-    baseCenter.x = (node0.x + node1.x + node2.x + node3.x) / 4.0;
-    baseCenter.y = (node0.y + node1.y + node2.y + node3.y) / 4.0;
-    baseCenter.z = (node0.z + node1.z + node2.z + node3.z) / 4.0;
+    Point const center_of_base = {
+        (node_0.x + node_1.x + node_2.x + node_3.x) / 4.0,
+        (node_0.y + node_1.y + node_2.y + node_3.y) / 4.0,
+        (node_0.z + node_1.z + node_2.z + node_3.z) / 4.0};
 
-    Point v01 = {node1.x - node0.x, node1.y - node0.y, node1.z - node0.z};
-    Point v04 = {node2.x - node0.x, node2.y - node0.y, node2.z - node0.z};
-    Point v0p = {point.x,point.y,point.z};
-    
-    double v01norm = v01.x * v01.x + v01.y * v01.y + v01.z * v01.z;
-    double v04norm = v04.x * v04.x + v04.y * v04.y + v04.z * v04.z;
+    Point const vertice_0_minus_1 = {node_1.x - node_0.x, node_1.y - node_0.y,
+                                     node_1.z - node_0.z};
 
-    double ksi = (v0p.x * v01.x + v0p.y * v01.y + v0p.z * v01.z) / v01norm;
-    double nu = (v0p.x * v04.x + v0p.y * v04.y + v0p.z * v04.z) / v04norm;
+    Point const vertice_0_minus_4 = {node_2.x - node_0.x, node_2.y - node_0.y,
+                                     node_2.z - node_0.z};
 
-    double tx = (vertex.x - baseCenter.x), 
-           ty = (vertex.y - baseCenter.y), 
-           tz = (vertex.z - baseCenter.z);
+    Point const vertice_0_minus_point = {point.x, point.y, point.z};
 
-    double tnorm = tx * tx + ty * ty + tz * tz;
+    double const norm_of_vertice_0_minus_1 =
+        vertice_0_minus_1.x * vertice_0_minus_1.x +
+        vertice_0_minus_1.y * vertice_0_minus_1.y +
+        vertice_0_minus_1.z * vertice_0_minus_1.z;
 
-    Point pointVector = {point.x - baseCenter.x, point.y - baseCenter.y, point.z - baseCenter.z};
-    double tetta = (pointVector.x * tx + pointVector.y * ty + pointVector.z * tz) / tnorm;   
+    double const norm_of_vertice_0_minus_4 =
+        vertice_0_minus_4.x * vertice_0_minus_4.x +
+        vertice_0_minus_4.y * vertice_0_minus_4.y +
+        vertice_0_minus_4.z * vertice_0_minus_4.z;
 
-    switch(numberBasisFunction) {
+    double const ksi_parameter =
+        (vertice_0_minus_point.x * vertice_0_minus_1.x +
+         vertice_0_minus_point.y * vertice_0_minus_1.y +
+         vertice_0_minus_point.z * vertice_0_minus_1.z) /
+        norm_of_vertice_0_minus_1;
 
+    double const nu_parameter =
+        (vertice_0_minus_point.x * vertice_0_minus_4.x +
+         vertice_0_minus_point.y * vertice_0_minus_4.y +
+         vertice_0_minus_point.z * vertice_0_minus_4.z) /
+        norm_of_vertice_0_minus_4;
+
+    Point const vetice_vertex_minus_center = {(vertex.x - center_of_base.x),
+                                              (vertex.y - center_of_base.y),
+                                              (vertex.z - center_of_base.z)};
+
+    double const norm_of_vetice_vertex_minus_center =
+        vetice_vertex_minus_center.x * vetice_vertex_minus_center.x +
+        vetice_vertex_minus_center.y * vetice_vertex_minus_center.y +
+        vetice_vertex_minus_center.z * vetice_vertex_minus_center.z;
+
+    Point const vetice_point_minus_center = {point.x - center_of_base.x,
+                                             point.y - center_of_base.y,
+                                             point.z - center_of_base.z};
+
+    double const tetta_parameter =
+        (vetice_point_minus_center.x * vetice_vertex_minus_center.x +
+         vetice_point_minus_center.y * vetice_vertex_minus_center.y +
+         vetice_point_minus_center.z * vetice_vertex_minus_center.z) /
+        norm_of_vetice_vertex_minus_center;
+
+    switch (number_basis_function) {
         case 0:
-            return (1 - ksi) * (1 - nu) * (1 - tetta);
+            return (1 - ksi_parameter) * (1 - nu_parameter) *
+                   (1 - tetta_parameter);
             break;
         case 1:
-            return ksi * (1 - nu) * (1 - tetta);
+            return ksi_parameter * (1 - nu_parameter) * (1 - tetta_parameter);
             break;
         case 2:
-            return (1 - ksi) * nu * (1 - tetta);
+            return (1 - ksi_parameter) * nu_parameter * (1 - tetta_parameter);
             break;
         case 3:
-            return ksi * nu * (1 - tetta);
+            return ksi_parameter * nu_parameter * (1 - tetta_parameter);
             break;
         case 4:
-            return tetta;
-            break;
-    }
-
-    return 0.0;
-}
-double FEM::GetDerivativeLinearBasisFunctionTest(Point point, Point node0, Point node1, Point node2, Point node3, int numberBasisFunction, int numberDerivativeParameter) {
-
-    Point vertex = {0.5,0.5,0.5};
-
-    Point baseCenter;
-    baseCenter.x = (node0.x + node1.x + node2.x + node3.x) / 4.0;
-    baseCenter.y = (node0.y + node1.y + node2.y + node3.y) / 4.0;
-    baseCenter.z = (node0.z + node1.z + node2.z + node3.z) / 4.0;
-
-    Point v01 = {node1.x - node0.x, node1.y - node0.y, node1.z - node0.z};
-    Point v04 = {node2.x - node0.x, node2.y - node0.y, node2.z - node0.z};
-    Point v0p = {point.x,point.y,point.z};
-    
-    double v01norm = v01.x * v01.x + v01.y * v01.y + v01.z * v01.z;
-    double v04norm = v04.x * v04.x + v04.y * v04.y + v04.z * v04.z;
-
-    double ksi = (v0p.x * v01.x + v0p.y * v01.y + v0p.z * v01.z) / v01norm;
-    double nu = (v0p.x * v04.x + v0p.y * v04.y + v0p.z * v04.z) / v04norm;
-
-    double tx = (vertex.x - baseCenter.x), 
-           ty = (vertex.y - baseCenter.y), 
-           tz = (vertex.z - baseCenter.z);
-
-    double tnorm = tx * tx + ty * ty + tz * tz;
-
-    Point pointVector = {point.x - baseCenter.x, point.y - baseCenter.y, point.z - baseCenter.z};
-    double tetta = (pointVector.x * tx + pointVector.y * ty + pointVector.z * tz) / tnorm;   
-
-    vector<vector<double>> J(3, vector<double>(3));
-    vector<vector<double>> JInv(3, vector<double>(3));
-
-    CalculateJacobian(node0, node1, node2, J);
-    InverseMatrix(J, JInv);
-        
-    double dN_dxi, dN_dnu, dN_dtetta;
-
-    switch (numberBasisFunction) {
-        case 0:
-            dN_dxi = - (1 - nu) * (1 - tetta);
-            dN_dnu = - (1 - ksi) * (1 - tetta);
-            dN_dtetta = - (1 - ksi) * (1 - nu);
-            break;
-        case 1:
-            dN_dxi = (1 - nu) * (1 - tetta);
-            dN_dnu = - ksi * (1 - tetta);
-            dN_dtetta = - ksi * (1 - nu);
-            break;
-        case 2:
-            dN_dxi = - nu * (1 - tetta);
-            dN_dnu = (1 - ksi) * (1 - tetta);
-            dN_dtetta = - (1 - ksi) * nu;
-            break;
-        case 3:
-            dN_dxi = nu * (1 - tetta);
-            dN_dnu = ksi * (1 - tetta);
-            dN_dtetta = - ksi * nu;
-            break;
-        case 4:
-            dN_dxi = 0;
-            dN_dnu = 0;
-            dN_dtetta = 1;
+            return tetta_parameter;
             break;
         default:
-            dN_dxi = 0;
-            dN_dnu = 0;
-            dN_dtetta = 0;
+            return 0.0;
+    }
+}
+
+double FEM::getDerivativeLinearBasisFunctionTest(
+    int number_basis_function, Point point, Point node_0, Point node_1,
+    Point node_2, Point node_3, int number_derivative_parameter) {
+    Point const vertex = {0.5, 0.5, 0.5};
+
+    Point const center_of_base = {
+        (node_0.x + node_1.x + node_2.x + node_3.x) / 4.0,
+        (node_0.y + node_1.y + node_2.y + node_3.y) / 4.0,
+        (node_0.z + node_1.z + node_2.z + node_3.z) / 4.0};
+
+    Point const vertice_0_minus_1 = {node_1.x - node_0.x, node_1.y - node_0.y,
+                                     node_1.z - node_0.z};
+
+    Point const vertice_0_minus_4 = {node_2.x - node_0.x, node_2.y - node_0.y,
+                                     node_2.z - node_0.z};
+
+    Point const vertice_0_minus_point = {point.x, point.y, point.z};
+
+    double const norm_of_vertice_0_minus_1 =
+        vertice_0_minus_1.x * vertice_0_minus_1.x +
+        vertice_0_minus_1.y * vertice_0_minus_1.y +
+        vertice_0_minus_1.z * vertice_0_minus_1.z;
+
+    double const norm_of_vertice_0_minus_4 =
+        vertice_0_minus_4.x * vertice_0_minus_4.x +
+        vertice_0_minus_4.y * vertice_0_minus_4.y +
+        vertice_0_minus_4.z * vertice_0_minus_4.z;
+
+    double const ksi_parameter =
+        (vertice_0_minus_point.x * vertice_0_minus_1.x +
+         vertice_0_minus_point.y * vertice_0_minus_1.y +
+         vertice_0_minus_point.z * vertice_0_minus_1.z) /
+        norm_of_vertice_0_minus_1;
+
+    double const nu_parameter =
+        (vertice_0_minus_point.x * vertice_0_minus_4.x +
+         vertice_0_minus_point.y * vertice_0_minus_4.y +
+         vertice_0_minus_point.z * vertice_0_minus_4.z) /
+        norm_of_vertice_0_minus_4;
+
+    Point const vetice_vertex_minus_center = {(vertex.x - center_of_base.x),
+                                              (vertex.y - center_of_base.y),
+                                              (vertex.z - center_of_base.z)};
+
+    double const norm_of_vetice_vertex_minus_center =
+        vetice_vertex_minus_center.x * vetice_vertex_minus_center.x +
+        vetice_vertex_minus_center.y * vetice_vertex_minus_center.y +
+        vetice_vertex_minus_center.z * vetice_vertex_minus_center.z;
+
+    Point const vetice_point_minus_center = {point.x - center_of_base.x,
+                                             point.y - center_of_base.y,
+                                             point.z - center_of_base.z};
+
+    double const tetta_parameter =
+        (vetice_point_minus_center.x * vetice_vertex_minus_center.x +
+         vetice_point_minus_center.y * vetice_vertex_minus_center.y +
+         vetice_point_minus_center.z * vetice_vertex_minus_center.z) /
+        norm_of_vetice_vertex_minus_center;
+
+    std::vector<std::vector<double>> jacobian(3, std::vector<double>(3));
+
+    std::vector<std::vector<double>> inversed_jacobian(3,
+                                                       std::vector<double>(3));
+
+    calculateJacobian(node_0, node_1, node_2, vertex, jacobian);
+
+    inverseMatrix(jacobian, inversed_jacobian);
+
+    double d_phi_d_ksi = 0.0;
+    double d_phi_d_nu = 0.0;
+    double d_phi_d_tetta = 0.0;
+
+    switch (number_basis_function) {
+        case 0:
+            d_phi_d_ksi = -(1 - nu_parameter) * (1 - tetta_parameter);
+            d_phi_d_nu = -(1 - ksi_parameter) * (1 - tetta_parameter);
+            d_phi_d_tetta = -(1 - ksi_parameter) * (1 - nu_parameter);
+            break;
+        case 1:
+            d_phi_d_ksi = (1 - nu_parameter) * (1 - tetta_parameter);
+            d_phi_d_nu = -ksi_parameter * (1 - tetta_parameter);
+            d_phi_d_tetta = -ksi_parameter * (1 - nu_parameter);
+            break;
+        case 2:
+            d_phi_d_ksi = -nu_parameter * (1 - tetta_parameter);
+            d_phi_d_nu = (1 - ksi_parameter) * (1 - tetta_parameter);
+            d_phi_d_tetta = -(1 - ksi_parameter) * nu_parameter;
+            break;
+        case 3:
+            d_phi_d_ksi = nu_parameter * (1 - tetta_parameter);
+            d_phi_d_nu = ksi_parameter * (1 - tetta_parameter);
+            d_phi_d_tetta = -ksi_parameter * nu_parameter;
+            break;
+        case 4:
+            d_phi_d_ksi = 0;
+            d_phi_d_nu = 0;
+            d_phi_d_tetta = 1;
+            break;
+        default:
             break;
     }
 
-    Point derivatives;
+    Point const derivatives = {d_phi_d_ksi * inversed_jacobian[0][0] +
+                                   d_phi_d_nu * inversed_jacobian[1][0] +
+                                   d_phi_d_tetta * inversed_jacobian[2][0],
+                               d_phi_d_ksi * inversed_jacobian[0][1] +
+                                   d_phi_d_nu * inversed_jacobian[1][1] +
+                                   d_phi_d_tetta * inversed_jacobian[2][1],
+                               d_phi_d_ksi * inversed_jacobian[0][2] +
+                                   d_phi_d_nu * inversed_jacobian[1][2] +
+                                   d_phi_d_tetta * inversed_jacobian[2][2]};
 
-    derivatives.x =   dN_dxi * JInv[0][0] +
-                      dN_dnu * JInv[1][0] +
-                      dN_dtetta * JInv[2][0];
-    derivatives.y =   dN_dxi * JInv[0][1] +
-                      dN_dnu * JInv[1][1] +
-                      dN_dtetta * JInv[2][1];
-    derivatives.z =   dN_dxi * JInv[0][2] +
-                      dN_dnu * JInv[1][2] +
-                      dN_dtetta * JInv[2][2];
-
-    switch (numberDerivativeParameter) {
-
-    case 0:
-        return derivatives.x;
-        break;
-    case 1:
-        return derivatives.y;
-        break;
-    case 2:
-        return derivatives.z;
-        break;
-    default:
-        break;
+    switch (number_derivative_parameter) {
+        case 0:
+            return derivatives.x;
+            break;
+        case 1:
+            return derivatives.y;
+            break;
+        case 2:
+            return derivatives.z;
+            break;
+        default:
+            return 0.0;
+            break;
     }
-
-    return 0.0;
 }
 
-void FEM::CalculateJacobian(Point node0, Point node1, Point node2, vector<vector<double>>& J) {
+void FEM::calculateJacobian(Point node_0, Point node_1, Point node_2,
+                            Point node_4,
+                            std::vector<std::vector<double>>& jacobian) {
+    jacobian[0][0] = node_1.x - node_0.x;
+    jacobian[0][1] = node_2.x - node_0.x;
+    jacobian[0][2] = node_4.x - node_0.x;
 
-    J[0][0] = node1.x - node0.x;
-    J[0][1] = node2.x - node0.x;
-    J[0][2] = nodes[8].x - node0.x;
+    jacobian[1][0] = node_1.y - node_0.y;
+    jacobian[1][1] = node_2.y - node_0.y;
+    jacobian[1][2] = node_4.y - node_0.y;
 
-    J[1][0] = node1.y - node0.y;
-    J[1][1] = node2.y - node0.y;
-    J[1][2] = nodes[8].y - node0.y;
-
-    J[2][0] = node1.z - node0.z;
-    J[2][1] = node2.z - node0.z;
-    J[2][2] = nodes[8].z - node0.z;
-}
-double FEM::CalculateDeterminant(vector<vector<double>>& matrix) {
-    return matrix[0][0] * (matrix[1][1] * matrix[2][2] - matrix[1][2] * matrix[2][1]) -
-           matrix[0][1] * (matrix[1][0] * matrix[2][2] - matrix[1][2] * matrix[2][0]) +
-           matrix[0][2] * (matrix[1][0] * matrix[2][1] - matrix[1][1] * matrix[2][0]);
-}
-void FEM::InverseMatrix(vector<vector<double>>& matrix, vector<vector<double>>& inv) {
-
-    double det = CalculateDeterminant(matrix);
-
-    inv[0][0] = (matrix[1][1] * matrix[2][2] - matrix[1][2] * matrix[2][1]) / det;
-    inv[0][1] = (matrix[0][2] * matrix[2][1] - matrix[0][1] * matrix[2][2]) / det;
-    inv[0][2] = (matrix[0][1] * matrix[1][2] - matrix[0][2] * matrix[1][1]) / det;
-
-    inv[1][0] = (matrix[1][2] * matrix[2][0] - matrix[1][0] * matrix[2][2]) / det;
-    inv[1][1] = (matrix[0][0] * matrix[2][2] - matrix[0][2] * matrix[2][0]) / det;
-    inv[1][2] = (matrix[0][2] * matrix[1][0] - matrix[0][0] * matrix[1][2]) / det;
-
-    inv[2][0] = (matrix[1][0] * matrix[2][1] - matrix[1][1] * matrix[2][0]) / det;
-    inv[2][1] = (matrix[0][1] * matrix[2][0] - matrix[0][0] * matrix[2][1]) / det;
-    inv[2][2] = (matrix[0][0] * matrix[1][1] - matrix[0][1] * matrix[1][0]) / det;
+    jacobian[2][0] = node_1.z - node_0.z;
+    jacobian[2][1] = node_2.z - node_0.z;
+    jacobian[2][2] = node_4.z - node_0.z;
 }
 
-double FEM::IntegrateBasisFunctions(int elementIndex, int firstBasis, int secondBasis) {
+double FEM::calculateDeterminant(std::vector<std::vector<double>>& matrix) {
+    return matrix[0][0] *
+               (matrix[1][1] * matrix[2][2] - matrix[1][2] * matrix[2][1]) -
+           matrix[0][1] *
+               (matrix[1][0] * matrix[2][2] - matrix[1][2] * matrix[2][0]) +
+           matrix[0][2] *
+               (matrix[1][0] * matrix[2][1] - matrix[1][1] * matrix[2][0]);
+}
 
-    int N = 20;
+void FEM::inverseMatrix(std::vector<std::vector<double>>& matrix,
+                        std::vector<std::vector<double>>& inversed_matrix) {
+    double const determinant = calculateDeterminant(matrix);
 
-    double dx = 1.0 / N;
-    double dy = 1.0 / N;
-    double dz = 1.0 / N;
+    inversed_matrix[0][0] =
+        (matrix[1][1] * matrix[2][2] - matrix[1][2] * matrix[2][1]) /
+        determinant;
+    inversed_matrix[0][1] =
+        (matrix[0][2] * matrix[2][1] - matrix[0][1] * matrix[2][2]) /
+        determinant;
+    inversed_matrix[0][2] =
+        (matrix[0][1] * matrix[1][2] - matrix[0][2] * matrix[1][1]) /
+        determinant;
+
+    inversed_matrix[1][0] =
+        (matrix[1][2] * matrix[2][0] - matrix[1][0] * matrix[2][2]) /
+        determinant;
+    inversed_matrix[1][1] =
+        (matrix[0][0] * matrix[2][2] - matrix[0][2] * matrix[2][0]) /
+        determinant;
+    inversed_matrix[1][2] =
+        (matrix[0][2] * matrix[1][0] - matrix[0][0] * matrix[1][2]) /
+        determinant;
+
+    inversed_matrix[2][0] =
+        (matrix[1][0] * matrix[2][1] - matrix[1][1] * matrix[2][0]) /
+        determinant;
+    inversed_matrix[2][1] =
+        (matrix[0][1] * matrix[2][0] - matrix[0][0] * matrix[2][1]) /
+        determinant;
+    inversed_matrix[2][2] =
+        (matrix[0][0] * matrix[1][1] - matrix[0][1] * matrix[1][0]) /
+        determinant;
+}
+
+double FEM::integrateBasisFunctions(
+    const std::tuple<int, int, int>& integral_parameters) {
+    int const count_of_segments = 20;
+
+    int const index_of_element = std::get<0>(integral_parameters);
+    int const index_of_first_basis_function = std::get<1>(integral_parameters);
+    int const index_of_second_basis_function = std::get<2>(integral_parameters);
+
+    double const x_integral_step = 1.0 / count_of_segments;
+    double const y_integral_step = 1.0 / count_of_segments;
+    double const z_integral_step = 1.0 / count_of_segments;
+
+    const auto node_indexes =
+        finite_elements[index_of_element].getNodeIndexes();
 
     double integral = 0.0;
 
-    for (int i = 0; i <= N; i++) {
-        for (int j = 0; j <= N; j++) {
-            for (int k = 0; k <= N; k++) {
+    for (int i = 0; i <= count_of_segments; i++) {
+        for (int j = 0; j <= count_of_segments; j++) {
+#pragma unroll 4
+            for (int k = 0; k <= count_of_segments; k++) {
+                Point const point = {nodes[0].x + k * x_integral_step,
+                                     nodes[0].y + j * y_integral_step,
+                                     nodes[0].z + i * z_integral_step};
 
-                Point point;
-
-                point.x = nodes[0].x + k * dx;
-                point.y = nodes[0].y + j * dy;
-                point.z = nodes[0].z + i * dz;
                 double weight = 1.0;
 
-                if (i == 0 || i == N) weight *= 0.5;
-                if (j == 0 || j == N) weight *= 0.5;
-                if (k == 0 || k == N) weight *= 0.5;
+                if (i == 0 || i == count_of_segments) {
+                    weight *= INTEGRAL_NORMALIZATION_FACTOR;
+                }
 
-                integral += weight * GetLinearBasisFunctionTest(point, nodes[finiteElements[elementIndex].nodeIndexes[0]], nodes[finiteElements[elementIndex].nodeIndexes[1]], nodes[finiteElements[elementIndex].nodeIndexes[2]], nodes[finiteElements[elementIndex].nodeIndexes[3]], firstBasis) 
-                                   * GetLinearBasisFunctionTest(point, nodes[finiteElements[elementIndex].nodeIndexes[0]], nodes[finiteElements[elementIndex].nodeIndexes[1]], nodes[finiteElements[elementIndex].nodeIndexes[2]], nodes[finiteElements[elementIndex].nodeIndexes[3]], secondBasis);
+                if (j == 0 || j == count_of_segments) {
+                    weight *= INTEGRAL_NORMALIZATION_FACTOR;
+                }
+
+                if (k == 0 || k == count_of_segments) {
+                    weight *= INTEGRAL_NORMALIZATION_FACTOR;
+                }
+
+                integral +=
+                    weight *
+                    getLinearBasisFunctionTest(point, nodes[node_indexes.at(0)],
+                                               nodes[node_indexes.at(1)],
+                                               nodes[node_indexes.at(2)],
+                                               nodes[node_indexes.at(3)],
+                                               index_of_first_basis_function) *
+                    getLinearBasisFunctionTest(point, nodes[node_indexes.at(0)],
+                                               nodes[node_indexes.at(1)],
+                                               nodes[node_indexes.at(2)],
+                                               nodes[node_indexes.at(3)],
+                                               index_of_second_basis_function);
             }
         }
     }
 
-    integral *= dx * dy * dz;
+    integral *= x_integral_step * y_integral_step * z_integral_step;
 
     return integral;
 }
-double FEM::IntegrateBasisFunctionForF(int elementIndex, int firstBasis) {
 
-    int N = 20;
+double FEM::integrateBasisFunctionForF(
+    const std::tuple<int, int>& integral_parameters) {
+    int const count_of_segments = 20;
 
-    double dx = 1.0 / N;
-    double dy = 1.0 / N;
-    double dz = 1.0 / N;
+    int const index_of_element = std::get<0>(integral_parameters);
+    int const index_of_basis_function = std::get<1>(integral_parameters);
+
+    double const x_integral_step = 1.0 / count_of_segments;
+    double const y_integral_step = 1.0 / count_of_segments;
+    double const z_integral_step = 1.0 / count_of_segments;
+
+    const auto node_indexes =
+        finite_elements[index_of_element].getNodeIndexes();
 
     double integral = 0.0;
 
-    for (int i = 0; i <= N; i++) {
-        for (int j = 0; j <= N; j++) {
-            for (int k = 0; k <= N; k++) {
+    for (int i = 0; i <= count_of_segments; i++) {
+        for (int j = 0; j <= count_of_segments; j++) {
+#pragma unroll 4
+            for (int k = 0; k <= count_of_segments; k++) {
+                Point const point = {nodes[0].x + k * x_integral_step,
+                                     nodes[0].y + j * y_integral_step,
+                                     nodes[0].z + i * z_integral_step};
 
-                Point point;
-
-                point.x = nodes[0].x + k * dx;
-                point.y = nodes[0].y + j * dy;
-                point.z = nodes[0].z + i * dz;
                 double weight = 1.0;
 
-                if (i == 0 || i == N) weight *= 0.5;
-                if (j == 0 || j == N) weight *= 0.5;
-                if (k == 0 || k == N) weight *= 0.5;
+                if (i == 0 || i == count_of_segments) {
+                    weight *= INTEGRAL_NORMALIZATION_FACTOR;
+                }
 
-                integral += weight * GetLinearBasisFunctionTest(point, nodes[finiteElements[elementIndex].nodeIndexes[0]], nodes[finiteElements[elementIndex].nodeIndexes[1]], nodes[finiteElements[elementIndex].nodeIndexes[2]], nodes[finiteElements[elementIndex].nodeIndexes[3]], firstBasis) 
-                                   * fFunction(point.x, point.y, point.z);
+                if (j == 0 || j == count_of_segments) {
+                    weight *= INTEGRAL_NORMALIZATION_FACTOR;
+                }
+
+                if (k == 0 || k == count_of_segments) {
+                    weight *= INTEGRAL_NORMALIZATION_FACTOR;
+                }
+
+                integral +=
+                    weight *
+                    getLinearBasisFunctionTest(
+                        point, nodes[node_indexes.at(0)],
+                        nodes[node_indexes.at(1)], nodes[node_indexes.at(2)],
+                        nodes[node_indexes.at(3)], index_of_basis_function) *
+                    calculateF(point);
             }
         }
     }
 
-    integral *= dx * dy * dz;
+    integral *= x_integral_step * y_integral_step * z_integral_step;
 
     return integral;
 }
-double FEM::IntegrateDerivativeBasisFunctions(int elementIndex, int firstBasis, int secondBasis) {
 
-    int N = 20;
+double FEM::integrateDerivativeBasisFunctions(
+    const std::tuple<int, int, int>& integral_parameters) {
+    int const count_of_segments = 20;
 
-    double dx = 1.0 / N;
-    double dy = 1.0 / N;
-    double dz = 1.0 / N;
+    int const index_of_element = std::get<0>(integral_parameters);
+    int const index_of_first_basis_function = std::get<1>(integral_parameters);
+    int const index_of_second_basis_function = std::get<2>(integral_parameters);
+
+    double const x_integral_step = 1.0 / count_of_segments;
+    double const y_integral_step = 1.0 / count_of_segments;
+    double const z_integral_step = 1.0 / count_of_segments;
+
+    double first_integral_component = 0.0;
+    double second_integral_component = 0.0;
+    double third_integral_component = 0.0;
+    double fourth_integral_component = 0.0;
+    double fifth_integral_component = 0.0;
+    double sixth_integral_component = 0.0;
+
+    const auto node_indexes =
+        finite_elements[index_of_element].getNodeIndexes();
+
     double integral = 0.0;
 
-    for (int i = 0; i <= N; i++) {
-        for (int j = 0; j <= N; j++) {
-            for (int k = 0; k <= N; k++) {
+    for (int i = 0; i <= count_of_segments; i++) {
+        for (int j = 0; j <= count_of_segments; j++) {
+#pragma unroll 4
+            for (int k = 0; k <= count_of_segments; k++) {
+                Point const point = {nodes[0].x + k * x_integral_step,
+                                     nodes[0].y + j * y_integral_step,
+                                     nodes[0].z + i * z_integral_step};
 
-                Point point;
-
-                point.x = nodes[0].x + k * dx;
-                point.y = nodes[0].y + j * dy;
-                point.z = nodes[0].z + i * dz;
                 double weight = 1.0;
 
-                if (i == 0 || i == N) weight *= 0.5;
-                if (j == 0 || j == N) weight *= 0.5;
-                if (k == 0 || k == N) weight *= 0.5;
+                if (i == 0 || i == count_of_segments) {
+                    weight *= INTEGRAL_NORMALIZATION_FACTOR;
+                }
 
-                integral += weight * (GetDerivativeLinearBasisFunctionTest(point, nodes[finiteElements[elementIndex].nodeIndexes[0]], nodes[finiteElements[elementIndex].nodeIndexes[1]], nodes[finiteElements[elementIndex].nodeIndexes[2]], nodes[finiteElements[elementIndex].nodeIndexes[3]], firstBasis, 0)  *
-                                      GetDerivativeLinearBasisFunctionTest(point, nodes[finiteElements[elementIndex].nodeIndexes[0]], nodes[finiteElements[elementIndex].nodeIndexes[1]], nodes[finiteElements[elementIndex].nodeIndexes[2]], nodes[finiteElements[elementIndex].nodeIndexes[3]], secondBasis, 0) +  
-                                      GetDerivativeLinearBasisFunctionTest(point, nodes[finiteElements[elementIndex].nodeIndexes[0]], nodes[finiteElements[elementIndex].nodeIndexes[1]], nodes[finiteElements[elementIndex].nodeIndexes[2]], nodes[finiteElements[elementIndex].nodeIndexes[3]], firstBasis, 1)  *
-                                      GetDerivativeLinearBasisFunctionTest(point, nodes[finiteElements[elementIndex].nodeIndexes[0]], nodes[finiteElements[elementIndex].nodeIndexes[1]], nodes[finiteElements[elementIndex].nodeIndexes[2]], nodes[finiteElements[elementIndex].nodeIndexes[3]], secondBasis, 1) +  
-                                      GetDerivativeLinearBasisFunctionTest(point, nodes[finiteElements[elementIndex].nodeIndexes[0]], nodes[finiteElements[elementIndex].nodeIndexes[1]], nodes[finiteElements[elementIndex].nodeIndexes[2]], nodes[finiteElements[elementIndex].nodeIndexes[3]], firstBasis, 2)  *
-                                      GetDerivativeLinearBasisFunctionTest(point, nodes[finiteElements[elementIndex].nodeIndexes[0]], nodes[finiteElements[elementIndex].nodeIndexes[1]], nodes[finiteElements[elementIndex].nodeIndexes[2]], nodes[finiteElements[elementIndex].nodeIndexes[3]], secondBasis, 2))
-                                    ;
+                if (j == 0 || j == count_of_segments) {
+                    weight *= INTEGRAL_NORMALIZATION_FACTOR;
+                }
+
+                if (k == 0 || k == count_of_segments) {
+                    weight *= INTEGRAL_NORMALIZATION_FACTOR;
+                }
+
+                second_integral_component =
+                    getDerivativeLinearBasisFunctionTest(
+                        index_of_second_basis_function, point,
+                        nodes[node_indexes.at(0)], nodes[node_indexes.at(1)],
+                        nodes[node_indexes.at(2)], nodes[node_indexes.at(3)],
+                        0);
+
+                fourth_integral_component =
+                    getDerivativeLinearBasisFunctionTest(
+                        index_of_second_basis_function, point,
+                        nodes[node_indexes.at(0)], nodes[node_indexes.at(1)],
+                        nodes[node_indexes.at(2)], nodes[node_indexes.at(3)],
+                        1);
+
+                sixth_integral_component = getDerivativeLinearBasisFunctionTest(
+                    index_of_second_basis_function, point,
+                    nodes[node_indexes.at(0)], nodes[node_indexes.at(1)],
+                    nodes[node_indexes.at(2)], nodes[node_indexes.at(3)], 2);
+
+                first_integral_component = getDerivativeLinearBasisFunctionTest(
+                    index_of_first_basis_function, point,
+                    nodes[node_indexes.at(0)], nodes[node_indexes.at(1)],
+                    nodes[node_indexes.at(2)], nodes[node_indexes.at(3)], 0);
+
+                third_integral_component = getDerivativeLinearBasisFunctionTest(
+                    index_of_first_basis_function, point,
+                    nodes[node_indexes.at(0)], nodes[node_indexes.at(1)],
+                    nodes[node_indexes.at(2)], nodes[node_indexes.at(3)], 1);
+
+                fifth_integral_component = getDerivativeLinearBasisFunctionTest(
+                    index_of_first_basis_function, point,
+                    nodes[node_indexes.at(0)], nodes[node_indexes.at(1)],
+                    nodes[node_indexes.at(2)], nodes[node_indexes.at(3)], 2);
+
+                integral +=
+                    weight *
+                    (first_integral_component * second_integral_component +
+                     third_integral_component * fourth_integral_component +
+                     fifth_integral_component * sixth_integral_component);
             }
         }
     }
 
-    integral *= dx * dy * dz;
+    integral *= x_integral_step * y_integral_step * z_integral_step;
 
     return integral;
 }

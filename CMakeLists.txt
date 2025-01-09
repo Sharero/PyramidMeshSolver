@@ -1,15 +1,13 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.10)
 
 project(test)
 
-add_executable(my_app main.cpp grid.cpp fem.cpp slae.cpp msg.cpp)
+add_executable(my_app src/main.cpp src/grid.cpp src/fem.cpp src/slae.cpp src/msg.cpp)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-cmake_minimum_required(VERSION 3.10)
-
 add_custom_target(visualize
-    COMMAND ${CMAKE_COMMAND} -E env python3 ${CMAKE_SOURCE_DIR}/draw.py
+    COMMAND ${CMAKE_COMMAND} -E env python3 ${CMAKE_SOURCE_DIR}/python/draw.py
     DEPENDS my_app
 )
 
@@ -17,6 +15,6 @@ add_custom_target(visualize
 add_custom_command(
     TARGET my_app POST_BUILD
     COMMAND my_app
-    COMMAND ${CMAKE_COMMAND} --build . --target visualize
+    # COMMAND ${CMAKE_COMMAND} --build . --target visualize
     COMMAND ${CMAKE_COMMAND} -E remove $<TARGET_FILE:my_app>
 )

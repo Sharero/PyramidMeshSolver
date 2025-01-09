@@ -1,33 +1,25 @@
-#include "fem.h"
+#include <string_view>
 
-using namespace std;
+#include "../include/fem.h"
+#include "../include/grid.h"
 
-int main(void) {
+static constexpr std::string_view GRID_INPUT_FILE_NAME = "../data/gridInfo.txt";
+static constexpr std::string_view BOUNDARIES_INPUT_FILE_NAME =
+    "../data/boundaries.txt";
+
+int main() {
     FEM fem;
 
-    int dota_jopa = 2;
+    const std::vector<Point> test_points = {{5E-1, 5E-1, 0E-1},
+                                            {0E-1, 5E-1, 0E-1},
+                                            {5E-1, 5E-1, 10E-1},
+                                            {5E-1, 10E-1, 75E-2}};
 
-    Point point1 = {5E-1, 5E-1, 0E-1};
-    Point point2 = {0E-1, 5E-1, 0E-1};
-    Point point3 = {5E-1, 5E-1, 10E-1};
-    Point point4 = {5E-1, 10E-1, 75E-2};
-
-    fem.GenerateLinearData("data/gridInfo.txt");
-    fem.InputBoundaryConditions("data/boundaries.txt");
-    fem.SaveGridForVisualize();
-    fem.GenerateMatrixPortrait();
-    fem.AssemblyGlobalMatrix();
-    fem.SolveFEM();
-
-    // cout << scientific << fem.GetResultAtPoint(point1, 4) << " " <<
-    // fem.UFunction(point1) << " " << abs(fem.GetResultAtPoint(point1, 4) -
-    // fem.UFunction(point1)) << endl; cout << scientific <<
-    // fem.GetResultAtPoint(point2, 1) << " " << fem.UFunction(point2) << " " <<
-    // abs(fem.GetResultAtPoint(point2, 1) - fem.UFunction(point2)) << endl;
-    // cout
-    // << scientific << fem.GetResultAtPoint(point3, 5) << " " <<
-    // fem.UFunction(point3) << " " << abs(fem.GetResultAtPoint(point3, 5) -
-    // fem.UFunction(point3)) << endl; cout << scientific <<
-    // fem.GetResultAtPoint(point4, 3) << " " << fem.UFunction(point4) << " " <<
-    // abs(fem.GetResultAtPoint(point4, 3) - fem.UFunction(point4)) << endl;
+    fem.generateLinearData(GRID_INPUT_FILE_NAME);
+    fem.inputBoundaryConditions(BOUNDARIES_INPUT_FILE_NAME);
+    fem.saveGridForVisualize();
+    fem.generatePortrait();
+    fem.assemblyGlobalComponents();
+    fem.solveFEM();
+    fem.printTestResults(test_points);
 }

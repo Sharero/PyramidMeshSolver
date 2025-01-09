@@ -1,74 +1,105 @@
-#include "grid.h"
+#include "../include/grid.h"
 
-void Grid::GenerateGrid(string inputFileName) {
+#include <algorithm>
+#include <filesystem>
+#include <fstream>
+#include <iostream>
 
+const double MIDPOINT_DIVISOR = 2.0;
+
+void Grid::generateGrid(const std::filesystem::path& input_file_name) {
     {
-        ifstream inputFile(inputFileName);
+        std::ifstream input_file(input_file_name, std::ios::in);
 
-        inputFile >> minimumX >> maximumX >>
-                     minimumY >> maximumY >>
-                     minimumZ >> maximumZ;
+        input_file >> minimum_x_coordinate >> maximum_x_coordinate >>
+            minimum_y_coordinate >> maximum_y_coordinate >>
+            minimum_z_coordinate >> maximum_z_coordinate;
 
-        inputFile >> stepX >> stepY >> stepZ;
-        inputFile >> scaleX >> scaleY >> scaleZ;
+        input_file >> grid_x_step >> grid_y_step >> grid_z_step;
+
+        input_file >> grid_x_scale >> grid_y_scale >> grid_z_scale;
     }
 
-    countX = (maximumX - minimumX) / stepX + 1;
-    countY = (maximumY - minimumY) / stepY + 1;
-    countZ = (maximumZ - minimumZ) / stepZ;
+    count_x_points = static_cast<int>(
+        (maximum_x_coordinate - minimum_x_coordinate) / grid_x_step + 1);
 
-    pyramidHeight = {(maximumX + minimumX) / 2.0, (maximumY + minimumY) / 2.0, maximumZ};
+    count_y_points = static_cast<int>(
+        (maximum_y_coordinate - minimum_y_coordinate) / grid_y_step + 1);
 
-    gridX.resize(countX);
-    gridY.resize(countY);
-    gridZ.resize(countZ);
+    count_z_points = static_cast<int>(
+        (maximum_z_coordinate - minimum_z_coordinate) / grid_z_step);
 
-    for (size_t i = 0; i < countX; i++) {
+    pyramidHeight = {
+        (maximum_x_coordinate + minimum_x_coordinate) / MIDPOINT_DIVISOR,
+        (maximum_y_coordinate + minimum_y_coordinate) / MIDPOINT_DIVISOR,
+        maximum_z_coordinate};
 
-        gridX[i] = minimumX + i * stepX;
-    }
+    grid_x.resize(count_x_points);
+    grid_y.resize(count_y_points);
+    grid_z.resize(count_z_points);
 
-    for (size_t i = 0; i < countY; i++) {
+    const double step_x = grid_x_step;
+    const double step_y = grid_y_step;
+    const double step_z = grid_z_step;
 
-        gridY[i] = minimumY + i * stepY;
-    }
+    const double minimum_x = minimum_x_coordinate;
+    const double minimum_y = minimum_y_coordinate;
+    const double minimum_z = minimum_z_coordinate;
 
-    for (size_t i = 0; i < countZ; i++) {
+    std::transform(
+        grid_x.begin(), grid_x.end(), grid_x.begin(),
+        [step_x, minimum_x, current_index = 0](double& grid_x_value) mutable {
+            grid_x_value += current_index * step_x + minimum_x;
+            ++current_index;
+            return grid_x_value;
+        });
 
-        gridZ[i] = minimumZ + i * stepZ;
-    }
+    std::transform(
+        grid_y.begin(), grid_y.end(), grid_y.begin(),
+        [step_y, minimum_y, current_index = 0](double& grid_y_value) mutable {
+            grid_y_value += current_index * step_y + minimum_y;
+            ++current_index;
+            return grid_y_value;
+        });
+
+    std::transform(
+        grid_z.begin(), grid_z.end(), grid_z.begin(),
+        [step_z, minimum_z, current_index = 0](double& grid_z_value) mutable {
+            grid_z_value += current_index * step_z + minimum_z;
+            ++current_index;
+            return grid_z_value;
+        });
 }
 
-void Grid::PrintGridInfo() {
+void Grid::printGridInfo() {
+    std::cout << "stepX: " << grid_x_step << " ";
+    std::cout << "scaleX: " << grid_x_scale << '\n';
+    std::cout << "grid_x: ";
 
-
-    cout << "stepX: " << stepX << " ";
-    cout << "scaleX: " << scaleX << endl;
-    cout << "gridX: ";
-    for (size_t i = 0; i < gridX.size(); i++) {
-
-        cout << gridX[i] << " ";
+#pragma unroll 4
+    for (double const grid_x_element : grid_x) {
+        std::cout << grid_x_element << " ";
     }
 
-    cout << endl << endl;
+    std::cout << '\n' << '\n';
+    std::cout << "stepY: " << grid_y_step << " ";
+    std::cout << "scaleY: " << grid_y_scale << '\n';
+    std::cout << "grid_y: ";
 
-    cout << "stepY: " << stepY << " ";
-    cout << "scaleY: " << scaleY << endl;
-    cout << "gridY: ";
-    for (size_t i = 0; i < gridY.size(); i++) {
-
-        cout << gridY[i] << " ";
+#pragma unroll 4
+    for (double const grid_y_element : grid_y) {
+        std::cout << grid_y_element << " ";
     }
 
-    cout << endl << endl;
+    std::cout << '\n' << '\n';
+    std::cout << "stepZ: " << grid_z_step << " ";
+    std::cout << "scaleZ: " << grid_z_scale << '\n';
+    std::cout << "grid_z: ";
 
-    cout << "stepZ: " << stepZ << " ";
-    cout << "scaleZ: " << scaleZ << endl;
-    cout << "gridZ: ";
-    for (size_t i = 0; i < gridZ.size(); i++) {
-
-        cout << gridZ[i] << " ";
+#pragma unroll 4
+    for (double const grid_z_element : grid_z) {
+        std::cout << grid_z_element << " ";
     }
 
-    cout << endl;
+    std::cout << '\n';
 }
