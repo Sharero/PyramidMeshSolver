@@ -13,6 +13,8 @@
 
 #include "../include/grid.h"
 
+static constexpr std::string_view RESULT_OUTPUT_FILE_NAME =
+    "../data/output/result.txt";
 const double TETRAHEDRON_VOLUME_DIVISOR = 6.0;
 const double INTEGRAL_NORMALIZATION_FACTOR = 0.5;
 
@@ -36,28 +38,39 @@ double FEM::calculateU(Point point) {
     // return sin(point.x * point.y * point.z);
 }
 
-void FEM::printTestResults(const std::vector<Point>& test_points) {
-    int const first_column_step = 10;
+void FEM::saveTestResults(const std::vector<Point>& test_points) {
+    int const first_column_step = 12;
     int const second_column_step = 15;
-    int const third_column_step = 20;
+    int const third_column_step = 18;
 
     int const numbers_in_float = 6;
 
-    std::cout << std::setw(first_column_step) << "u"
-              << std::setw(second_column_step) << "u*"
-              << std::setw(third_column_step) << "|u - u*|" << '\n';
+    {
+        std::filesystem::path const file_name = RESULT_OUTPUT_FILE_NAME;
+        std::ofstream result_out(file_name);
 
-    std::cout << std::fixed << std::setprecision(numbers_in_float);
+        result_out << std::setw(first_column_step) << "x"
+                   << std::setw(second_column_step) << "y"
+                   << std::setw(second_column_step) << "z"
+                   << std::setw(second_column_step) << "u"
+                   << std::setw(second_column_step) << "u*"
+                   << std::setw(third_column_step) << "|u - u*|" << '\n';
+
+        result_out << std::fixed << std::setprecision(numbers_in_float);
 
 #pragma unroll 4
-    for (const auto& point : test_points) {
-        double const true_result = calculateU(point);
-        double const result = getResultAtPoint(point);
+        for (const auto& point : test_points) {
+            double const true_result = calculateU(point);
+            double const result = getResultAtPoint(point);
 
-        std::cout << std::setw(first_column_step) << result
-                  << std::setw(second_column_step) << true_result
-                  << std::setw(third_column_step)
-                  << std::abs(true_result - result) << '\n';
+            result_out << std::setw(second_column_step) << point.x
+                       << std::setw(second_column_step) << point.y
+                       << std::setw(second_column_step) << point.z
+                       << std::setw(second_column_step) << result
+                       << std::setw(second_column_step) << true_result
+                       << std::setw(second_column_step)
+                       << std::abs(true_result - result) << '\n';
+        }
     }
 }
 
@@ -252,21 +265,26 @@ void FEM::solveFEM() {
 }
 
 void FEM::saveGridForVisualize() {
-    std::ofstream out_nodes("data/nodes.txt");
+    {
+        std::ofstream out_nodes("..data/output/nodes.txt");
 
 #pragma unroll 4
-    for (auto& node : nodes) {
-        out_nodes << node.x << " " << node.y << " " << node.z << '\n';
+        for (auto& node : nodes) {
+            out_nodes << node.x << " " << node.y << " " << node.z << '\n';
+        }
     }
 
-    std::ofstream out_elements("data/elements.txt");
+    {
+        std::ofstream out_elements("..data/output/elements.txt");
 
 #pragma unroll 4
-    for (auto& element : finite_elements) {
-        const auto node_indexes = element.getNodeIndexes();
-        out_elements << node_indexes.at(0) << " " << node_indexes.at(1) << " "
-                     << node_indexes.at(2) << " " << node_indexes.at(3) << " "
-                     << node_indexes.at(4) << '\n';
+        for (auto& element : finite_elements) {
+            const auto node_indexes = element.getNodeIndexes();
+            out_elements << node_indexes.at(0) << " " << node_indexes.at(1)
+                         << " " << node_indexes.at(2) << " "
+                         << node_indexes.at(3) << " " << node_indexes.at(4)
+                         << '\n';
+        }
     }
 }
 

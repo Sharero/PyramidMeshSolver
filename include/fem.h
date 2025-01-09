@@ -62,7 +62,7 @@ class FEM {
 
     static double calculateU(Point point);
 
-    void printTestResults(const std::vector<Point>& test_points);
+    void saveTestResults(const std::vector<Point>& test_points);
 
     static double getLinearBasisFunctionTest(Point point, Point node_0,
                                              Point node_1, Point node_2,

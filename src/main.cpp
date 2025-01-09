@@ -1,11 +1,13 @@
 #include <string_view>
+#include <vector>
 
 #include "../include/fem.h"
 #include "../include/grid.h"
 
-static constexpr std::string_view GRID_INPUT_FILE_NAME = "../data/gridInfo.txt";
+static constexpr std::string_view GRID_INPUT_FILE_NAME =
+    "../data/input/gridInfo.txt";
 static constexpr std::string_view BOUNDARIES_INPUT_FILE_NAME =
-    "../data/boundaries.txt";
+    "../data/input/boundaries.txt";
 
 int main() {
     FEM fem;
@@ -21,5 +23,5 @@ int main() {
     fem.generatePortrait();
     fem.assemblyGlobalComponents();
     fem.solveFEM();
-    fem.printTestResults(test_points);
+    fem.saveTestResults(test_points);
 }
