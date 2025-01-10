@@ -15,7 +15,13 @@
 
 static constexpr std::string_view RESULT_OUTPUT_FILE_NAME =
     "../data/output/result.txt";
+
+const double MIDPOINT_DIVISOR = 2.0;
+
+const double NUMBERS_EQUAL_EPSILON = 1e-15;
+
 const double TETRAHEDRON_VOLUME_DIVISOR = 6.0;
+
 const double INTEGRAL_NORMALIZATION_FACTOR = 0.5;
 
 double FEM::calculateF(Point point) {
@@ -74,75 +80,115 @@ void FEM::saveTestResults(const std::vector<Point>& test_points) {
     }
 }
 
-void FEM::generateLinearData(std::string_view const& input_file_name) {
-    nodes.resize(9);
-    finite_elements.resize(6);
+bool FEM::isNumbersEqual(double first_number, double second_number,
+                         double epsilon) {
+    return std::fabs(first_number - second_number) < epsilon;
+}
 
-    nodes[0] = {0, 0, 0};
-    nodes[1] = {1, 0, 0};
-    nodes[2] = {0, 1, 0};
-    nodes[3] = {1, 1, 0};
-    nodes[4] = {0, 0, 1};
-    nodes[5] = {1, 0, 1};
-    nodes[6] = {0, 1, 1};
-    nodes[7] = {1, 1, 1};
-    nodes[8] = {0.5, 0.5, 0.5};
+bool FEM::isPlane(double average, const Element& element, char axis) {
+    const auto node_indexes = element.getNodeIndexes();
 
-    finite_elements[0] = {0, 1, 4, 5, 8};
-    finite_elements[1] = {0, 2, 4, 6, 8};
-    finite_elements[2] = {1, 3, 5, 7, 8};
-    finite_elements[3] = {2, 3, 6, 7, 8};
-    finite_elements[4] = {0, 1, 2, 3, 8};
-    finite_elements[5] = {4, 5, 6, 7, 8};
+    switch (axis) {
+        case 'x':
+            return isNumbersEqual(nodes[node_indexes[0]].x, average,
+                                  NUMBERS_EQUAL_EPSILON) &&
+                   isNumbersEqual(nodes[node_indexes[1]].x, average,
+                                  NUMBERS_EQUAL_EPSILON) &&
+                   isNumbersEqual(nodes[node_indexes[2]].x, average,
+                                  NUMBERS_EQUAL_EPSILON) &&
+                   isNumbersEqual(nodes[node_indexes[3]].x, average,
+                                  NUMBERS_EQUAL_EPSILON);
+        case 'y':
+            return isNumbersEqual(nodes[node_indexes[0]].y, average,
+                                  NUMBERS_EQUAL_EPSILON) &&
+                   isNumbersEqual(nodes[node_indexes[1]].y, average,
+                                  NUMBERS_EQUAL_EPSILON) &&
+                   isNumbersEqual(nodes[node_indexes[2]].y, average,
+                                  NUMBERS_EQUAL_EPSILON) &&
+                   isNumbersEqual(nodes[node_indexes[3]].y, average,
+                                  NUMBERS_EQUAL_EPSILON);
+        case 'z':
+            return isNumbersEqual(nodes[node_indexes[0]].z, average,
+                                  NUMBERS_EQUAL_EPSILON) &&
+                   isNumbersEqual(nodes[node_indexes[1]].z, average,
+                                  NUMBERS_EQUAL_EPSILON) &&
+                   isNumbersEqual(nodes[node_indexes[2]].z, average,
+                                  NUMBERS_EQUAL_EPSILON) &&
+                   isNumbersEqual(nodes[node_indexes[3]].z, average,
+                                  NUMBERS_EQUAL_EPSILON);
+        default:
+            return false;
+    }
+}
 
-    // std::filesystem::path const file_name = input_file_name;
+void FEM::generateFEMData(std::string_view const& input_file_name) {
+    std::filesystem::path const file_name = input_file_name;
 
-    // grid.generateGrid(file_name);
+    mesh.generateGrid(file_name);
 
-    // for (size_t j = 0; j < grid.countY; j++) {
+    const std::vector<double> grid_x = mesh.getGridData('x');
+    const std::vector<double> grid_y = mesh.getGridData('y');
+    const std::vector<double> grid_z = mesh.getGridData('z');
 
-    //     for (size_t k = 0; k < grid.countX; k++) {
+    const Point pyramid_height = {
+        (grid_x[grid_x.size() - 1] + grid_x[0]) / MIDPOINT_DIVISOR,
+        (grid_y[grid_y.size() - 1] + grid_y[0]) / MIDPOINT_DIVISOR,
+        (grid_z[grid_z.size() - 1] + grid_z[0]) / MIDPOINT_DIVISOR};
 
-    //         nodes.push_back({grid.grid_x[k], grid.grid_y[j],
-    //         grid.grid_z[0]});
-    //     }
-    // }
+    for (const double& z_element : grid_z) {
+        for (const double& y_element : grid_y) {
+#pragma unroll 4
+            for (const double& x_element : grid_x) {
+                nodes.push_back({x_element, y_element, z_element});
+            }
+        }
+    }
 
-    // for (size_t i = 1; i < grid.count_z; i++) {
+    nodes.push_back(pyramid_height);
 
-    //     double scale = 1 - (grid.grid_z[i] / grid.pyramidHeight.z);
+    int const vertex_index = static_cast<int>(nodes.size()) - 1;
+    int const current_element_index = 0;
 
-    //     for (size_t j = 0; j < grid.countY * grid.countX; j++) {
+    for (int node_1 = 0; node_1 < vertex_index; ++node_1) {
+        for (int node_2 = node_1 + 1; node_2 < vertex_index; ++node_2) {
+            for (int node_3 = node_2 + 1; node_3 < vertex_index; ++node_3) {
+#pragma unroll 4
+                for (int node_4 = node_3 + 1; node_4 < vertex_index; ++node_4) {
+                    double const average_z_coordinate =
+                        (nodes[node_1].z + nodes[node_2].z + nodes[node_3].z +
+                         nodes[node_4].z) /
+                        4.0;
 
-    //         double x = nodes[j].x + (grid.pyramidHeight.x - nodes[j].x) *
-    //         (grid.grid_z[i] / grid.pyramidHeight.z); double y = nodes[j].y +
-    //         (grid.pyramidHeight.y - nodes[j].y) * (grid.grid_z[i] /
-    //         grid.pyramidHeight.z);
+                    bool const is_z_plane = isPlane(
+                        average_z_coordinate,
+                        Element(node_1, node_2, node_3, node_4, node_1), 'z');
 
-    //         nodes.push_back({x, y, grid.grid_z[i]});
-    //     }
-    // }
+                    double const average_x_coordinate =
+                        (nodes[node_1].x + nodes[node_2].x + nodes[node_3].x +
+                         nodes[node_4].x) /
+                        4.0;
 
-    // nodes.push_back(grid.pyramidHeight);
+                    bool const is_x_plane = isPlane(
+                        average_x_coordinate,
+                        Element(node_1, node_2, node_3, node_4, node_1), 'x');
 
-    // int apexIndex = nodes.size() - 1;
+                    double const average_y_coordinate =
+                        (nodes[node_1].y + nodes[node_2].y + nodes[node_3].y +
+                         nodes[node_4].y) /
+                        4.0;
 
-    // for (size_t k = 0; k < grid.count_z; k++) {
+                    bool const is_y_plane = isPlane(
+                        average_y_coordinate,
+                        Element(node_1, node_2, node_3, node_4, node_1), 'y');
 
-    //     for (int i = 0; i < grid.countX - 1; ++i) {
-
-    //         for (int j = 0; j < grid.countY - 1; ++j) {
-
-    //             int idx1 = i * grid.countX + j + k * grid.countX *
-    //             grid.countY; int idx2 = idx1 + 1; int idx3 = (i + 1) *
-    //             grid.countX + j + k * grid.countX * grid.countY; int idx4 =
-    //             idx3 + 1;
-
-    //             finiteElements.push_back({idx1, idx2, idx3, idx4,
-    //             apexIndex});
-    //         }
-    //     }
-    // }
+                    if (is_z_plane || is_x_plane || is_y_plane) {
+                        finite_elements.emplace_back(node_1, node_2, node_3,
+                                                     node_4, vertex_index);
+                    }
+                }
+            }
+        }
+    }
 
     nodes_count = nodes.size();
 
@@ -260,7 +306,14 @@ void FEM::assemblyGlobalComponents() {
 }
 
 void FEM::solveFEM() {
+    saveGridForVisualize();
+
+    generatePortrait();
+
+    assemblyGlobalComponents();
+
     slae.applyFirstBoundaryConditions(first_boundary_condition_nodes);
+
     slae.solveSLAE();
 }
 

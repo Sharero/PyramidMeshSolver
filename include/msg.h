@@ -13,6 +13,24 @@ class MSG {
 
     std::size_t slae_size{0};
 
+    void makeLLTDecomposition();
+
+    void calculateLLT(const std::vector<double>& f_vector,
+                      std::vector<double>& x_vector);
+
+    void calculateLT(const std::vector<double>& f_vector,
+                     std::vector<double>& x_vector);
+
+    void calculateL(const std::vector<double>& f_vector,
+                    std::vector<double>& x_vector);
+
+    void multiplyMatrixAndVector(const std::vector<double>& f_vector,
+                                 std::vector<double>& x_vector);
+
+    [[nodiscard]] double calculateScalarProduct(
+        const std::vector<double>& first_vector,
+        const std::vector<double>& second_vector) const;
+
    public:
     MSG(const std::vector<int>& rows_s, const std::vector<double>& di_s,
         const std::vector<int>& columns_s, const std::vector<double>& gg_s,
@@ -42,24 +60,6 @@ class MSG {
             gg_of_lower_triangle[i] = gg[i];
         }
     }
-
-    void makeLLTDecomposition();
-
-    void calculateLLT(const std::vector<double>& f_vector,
-                      std::vector<double>& x_vector);
-
-    void calculateLT(const std::vector<double>& f_vector,
-                     std::vector<double>& x_vector);
-
-    void calculateL(const std::vector<double>& f_vector,
-                    std::vector<double>& x_vector);
-
-    void multiplyMatrixAndVector(const std::vector<double>& f_vector,
-                                 std::vector<double>& x_vector);
-
-    [[nodiscard]] double calculateScalarProduct(
-        const std::vector<double>& first_vector,
-        const std::vector<double>& second_vector) const;
 
     void calculateSLAE(std::vector<double>& solution);
 };

@@ -57,12 +57,14 @@ class FEM {
     double lambda{1.0};
     double gamma{1.0};
 
-   public:
+    static bool isNumbersEqual(double first_number, double second_number,
+                               double epsilon);
+
+    bool isPlane(double average, const Element& element, char axis);
+
     static double calculateF(Point point);
 
     static double calculateU(Point point);
-
-    void saveTestResults(const std::vector<Point>& test_points);
 
     static double getLinearBasisFunctionTest(Point point, Point node_0,
                                              Point node_1, Point node_2,
@@ -93,18 +95,6 @@ class FEM {
     double integrateBasisFunctionForF(
         const std::tuple<int, int>& integral_parameters);
 
-    void generateLinearData(std::string_view const& input_file_name);
-
-    void inputBoundaryConditions(std::string_view const& input_file_name);
-
-    void generatePortrait();
-
-    void calculateLocalComponents(int index_of_finite_element);
-
-    void assemblyGlobalComponents();
-
-    void solveFEM();
-
     double getResultAtPoint(Point point);
 
     static Point calculateVectorCrossProduct(Point first_vector,
@@ -126,5 +116,20 @@ class FEM {
                                              Point second_tetrahedron_point,
                                              Point third_tetrahedron_point,
                                              Point fourth_tetrahedron_point);
+
+    void generatePortrait();
+
+    void calculateLocalComponents(int index_of_finite_element);
+
+    void assemblyGlobalComponents();
+
+   public:
+    void saveTestResults(const std::vector<Point>& test_points);
+
+    void generateFEMData(std::string_view const& input_file_name);
+
+    void inputBoundaryConditions(std::string_view const& input_file_name);
+
+    void solveFEM();
 };
 #endif

@@ -5,8 +5,6 @@
 #include <fstream>
 #include <iostream>
 
-const double MIDPOINT_DIVISOR = 2.0;
-
 void Grid::generateGrid(const std::filesystem::path& input_file_name) {
     {
         std::ifstream input_file(input_file_name, std::ios::in);
@@ -27,12 +25,7 @@ void Grid::generateGrid(const std::filesystem::path& input_file_name) {
         (maximum_y_coordinate - minimum_y_coordinate) / grid_y_step + 1);
 
     count_z_points = static_cast<int>(
-        (maximum_z_coordinate - minimum_z_coordinate) / grid_z_step);
-
-    pyramidHeight = {
-        (maximum_x_coordinate + minimum_x_coordinate) / MIDPOINT_DIVISOR,
-        (maximum_y_coordinate + minimum_y_coordinate) / MIDPOINT_DIVISOR,
-        maximum_z_coordinate};
+        (maximum_z_coordinate - minimum_z_coordinate) / grid_z_step + 1);
 
     grid_x.resize(count_x_points);
     grid_y.resize(count_y_points);
@@ -71,7 +64,7 @@ void Grid::generateGrid(const std::filesystem::path& input_file_name) {
         });
 }
 
-void Grid::printGridInfo() {
+void Grid::printGridData() {
     std::cout << "stepX: " << grid_x_step << " ";
     std::cout << "scaleX: " << grid_x_scale << '\n';
     std::cout << "grid_x: ";
