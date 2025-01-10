@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.10)
 
 project(test)
 
-add_executable(my_app src/main.cpp src/grid.cpp src/fem.cpp src/slae.cpp src/msg.cpp)
+add_executable(my_app src/main.cpp src/grid.cpp src/fem.cpp src/slae.cpp src/msg.cpp src/mathUtils.cpp src/integrator.cpp)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
