@@ -6,8 +6,14 @@
 
 static constexpr std::string_view GRID_INPUT_FILE_NAME =
     "../data/input/gridInfo.txt";
+
 static constexpr std::string_view BOUNDARIES_INPUT_FILE_NAME =
     "../data/input/boundaries.txt";
+
+const BASIS_TYPE BASIS_FUNCTIONS_TYPE = BASIS_TYPE::Lagrange;
+
+const BASIS_ELEMENT_TYPE BASIS_FUNCTIONS_ELEMENTS_TYPE =
+    BASIS_ELEMENT_TYPE::Cubic;
 
 int main() {
     const std::vector<Point> test_points = {{5E-1, 5E-1, 0E-1},
@@ -17,11 +23,15 @@ int main() {
 
     FEM fem;
 
-    fem.generateFEMData(GRID_INPUT_FILE_NAME);
+    fem.generateFEMData(GRID_INPUT_FILE_NAME, BASIS_FUNCTIONS_TYPE,
+                        BASIS_FUNCTIONS_ELEMENTS_TYPE);
 
-    fem.inputBoundaryConditions(BOUNDARIES_INPUT_FILE_NAME);
+    // fem.checkBasisFunctionsToEqualsOne(BASIS_FUNCTIONS_TYPE,
+    //                                    BASIS_FUNCTIONS_ELEMENTS_TYPE);
 
-    fem.solveFEM();
+    // fem.inputBoundaryConditions(BOUNDARIES_INPUT_FILE_NAME);
 
-    fem.saveTestResults(test_points);
+    // fem.solveFEM();
+
+    // fem.saveTestResults(test_points);
 }

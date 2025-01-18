@@ -14,7 +14,9 @@
 class FEM {
    private:
     SLAE slae;
+
     Integrator integrator;
+
     Grid mesh;
 
     std::vector<Point> nodes;
@@ -30,9 +32,16 @@ class FEM {
 
     std::size_t nodes_count{0};
     std::size_t finite_elements_count{0};
+    std::size_t number_of_vertices_of_pyramid{0};
 
     double lambda{1.0};
     double gamma{1.0};
+
+    void generateLinearNodes();
+
+    void generateQuadraticNodes();
+
+    void generateCubicNodes();
 
     double getResultAtPoint(Point point);
 
@@ -47,9 +56,15 @@ class FEM {
     void assemblyGlobalComponents();
 
    public:
+    void checkBasisFunctionsToEqualsOne(
+        BASIS_TYPE basis_functions_type,
+        BASIS_ELEMENT_TYPE basis_functions_elements_type);
+
     void saveTestResults(const std::vector<Point>& test_points);
 
-    void generateFEMData(std::string_view const& input_file_name);
+    void generateFEMData(std::string_view const& input_file_name,
+                         BASIS_TYPE basis_functions_type,
+                         BASIS_ELEMENT_TYPE basis_functions_elements_type);
 
     void inputBoundaryConditions(std::string_view const& input_file_name);
 

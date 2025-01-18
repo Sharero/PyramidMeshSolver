@@ -1,11 +1,26 @@
 #ifndef MATHUTILS_H
 #define MATHUTILS_H
 
+#include <tuple>
+
 #include "../include/element.h"
 #include "../include/grid.h"
 
 class MathUtils {
    public:
+    static double getBasisFunction(
+        const std::vector<Point>& nodes, Point point,
+        const std::vector<int>& node_indexes, BASIS_TYPE basis_functions_type,
+        BASIS_ELEMENT_TYPE basis_functions_elements_type,
+        int number_basis_function);
+
+    static bool isQudraticNodeIllegal(
+        const std::tuple<int, double, double, double>&
+            qudratic_node_parameters);
+
+    static bool isCubicNodeIllegal(
+        const std::tuple<int, int, int>& cubic_node_parameters);
+
     static double calculateF(Point point);
 
     static double calculateU(Point point);
@@ -16,14 +31,20 @@ class MathUtils {
     static bool isPlane(std::vector<Point>& nodes, double average,
                         const Element& element, char axis);
 
-    static double getLinearBasisFunctionTest(Point point, Point node_0,
-                                             Point node_1, Point node_2,
-                                             Point node_3,
-                                             int number_basis_function);
+    static double getLinearBasisFunction(Point point, Point node_0,
+                                         Point node_1, Point node_2,
+                                         Point node_3, Point vertex,
+                                         int number_basis_function);
 
-    static double getDerivativeLinearBasisFunctionTest(
+    static double getQuadraticBasisFunction(Point point, Point node_0,
+                                            Point node_1, Point node_2,
+                                            Point node_3, Point vertex,
+                                            int number_basis_function);
+
+    static double getDerivativeLinearBasisFunction(
         int number_basis_function, Point point, Point node_0, Point node_1,
-        Point node_2, Point node_3, int number_derivative_parameter);
+        Point node_2, Point node_3, Point vertex,
+        int number_derivative_parameter);
 
     static void calculateJacobian(Point node_0, Point node_1, Point node_2,
                                   Point node_4,

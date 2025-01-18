@@ -9,7 +9,7 @@
 
 const double INTEGRAL_NORMALIZATION_FACTOR = 0.5;
 
-double Integrator::integrateBasisFunctions(
+double Integrator::integrateForMassMatrix(
     const std::vector<Point>& nodes,
     const std::vector<Element>& finite_elements,
     const std::tuple<int, int, int>& integral_parameters) {
@@ -52,15 +52,15 @@ double Integrator::integrateBasisFunctions(
 
                 integral +=
                     weight *
-                    MathUtils::getLinearBasisFunctionTest(
+                    MathUtils::getLinearBasisFunction(
                         point, nodes[node_indexes.at(0)],
                         nodes[node_indexes.at(1)], nodes[node_indexes.at(2)],
-                        nodes[node_indexes.at(3)],
+                        nodes[node_indexes.at(3)], nodes[nodes.size() - 1],
                         index_of_first_basis_function) *
-                    MathUtils::getLinearBasisFunctionTest(
+                    MathUtils::getLinearBasisFunction(
                         point, nodes[node_indexes.at(0)],
                         nodes[node_indexes.at(1)], nodes[node_indexes.at(2)],
-                        nodes[node_indexes.at(3)],
+                        nodes[node_indexes.at(3)], nodes[nodes.size() - 1],
                         index_of_second_basis_function);
             }
         }
@@ -71,7 +71,7 @@ double Integrator::integrateBasisFunctions(
     return integral;
 }
 
-double Integrator::integrateBasisFunctionForF(
+double Integrator::integrateForRightPartVector(
     const std::vector<Point>& nodes,
     const std::vector<Element>& finite_elements,
     const std::tuple<int, int>& integral_parameters) {
@@ -113,10 +113,11 @@ double Integrator::integrateBasisFunctionForF(
 
                 integral +=
                     weight *
-                    MathUtils::getLinearBasisFunctionTest(
+                    MathUtils::getLinearBasisFunction(
                         point, nodes[node_indexes.at(0)],
                         nodes[node_indexes.at(1)], nodes[node_indexes.at(2)],
-                        nodes[node_indexes.at(3)], index_of_basis_function) *
+                        nodes[node_indexes.at(3)], nodes[nodes.size() - 1],
+                        index_of_basis_function) *
                     MathUtils::calculateF(point);
             }
         }
@@ -127,7 +128,7 @@ double Integrator::integrateBasisFunctionForF(
     return integral;
 }
 
-double Integrator::integrateDerivativeBasisFunctions(
+double Integrator::integrateForStiffnessMatrix(
     const std::vector<Point>& nodes,
     const std::vector<Element>& finite_elements,
     const std::tuple<int, int, int>& integral_parameters) {
@@ -176,46 +177,46 @@ double Integrator::integrateDerivativeBasisFunctions(
                 }
 
                 second_integral_component =
-                    MathUtils::getDerivativeLinearBasisFunctionTest(
+                    MathUtils::getDerivativeLinearBasisFunction(
                         index_of_second_basis_function, point,
                         nodes[node_indexes.at(0)], nodes[node_indexes.at(1)],
                         nodes[node_indexes.at(2)], nodes[node_indexes.at(3)],
-                        0);
+                        nodes[nodes.size() - 1], 0);
 
                 fourth_integral_component =
-                    MathUtils::getDerivativeLinearBasisFunctionTest(
+                    MathUtils::getDerivativeLinearBasisFunction(
                         index_of_second_basis_function, point,
                         nodes[node_indexes.at(0)], nodes[node_indexes.at(1)],
                         nodes[node_indexes.at(2)], nodes[node_indexes.at(3)],
-                        1);
+                        nodes[nodes.size() - 1], 1);
 
                 sixth_integral_component =
-                    MathUtils::getDerivativeLinearBasisFunctionTest(
+                    MathUtils::getDerivativeLinearBasisFunction(
                         index_of_second_basis_function, point,
                         nodes[node_indexes.at(0)], nodes[node_indexes.at(1)],
                         nodes[node_indexes.at(2)], nodes[node_indexes.at(3)],
-                        2);
+                        nodes[nodes.size() - 1], 2);
 
                 first_integral_component =
-                    MathUtils::getDerivativeLinearBasisFunctionTest(
+                    MathUtils::getDerivativeLinearBasisFunction(
                         index_of_first_basis_function, point,
                         nodes[node_indexes.at(0)], nodes[node_indexes.at(1)],
                         nodes[node_indexes.at(2)], nodes[node_indexes.at(3)],
-                        0);
+                        nodes[nodes.size() - 1], 0);
 
                 third_integral_component =
-                    MathUtils::getDerivativeLinearBasisFunctionTest(
+                    MathUtils::getDerivativeLinearBasisFunction(
                         index_of_first_basis_function, point,
                         nodes[node_indexes.at(0)], nodes[node_indexes.at(1)],
                         nodes[node_indexes.at(2)], nodes[node_indexes.at(3)],
-                        1);
+                        nodes[nodes.size() - 1], 1);
 
                 fifth_integral_component =
-                    MathUtils::getDerivativeLinearBasisFunctionTest(
+                    MathUtils::getDerivativeLinearBasisFunction(
                         index_of_first_basis_function, point,
                         nodes[node_indexes.at(0)], nodes[node_indexes.at(1)],
                         nodes[node_indexes.at(2)], nodes[node_indexes.at(3)],
-                        2);
+                        nodes[nodes.size() - 1], 2);
 
                 integral +=
                     weight *

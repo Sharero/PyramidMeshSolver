@@ -1,6 +1,7 @@
 #include "../include/mathUtils.h"
 
 #include <cmath>
+#include <tuple>
 #include <vector>
 
 #include "../include/element.h"
@@ -9,6 +10,53 @@
 const double NUMBERS_EQUAL_EPSILON = 1e-15;
 
 const double TETRAHEDRON_VOLUME_DIVISOR = 6.0;
+
+bool MathUtils::isQudraticNodeIllegal(
+    const std::tuple<int, double, double, double>& qudratic_node_parameters) {
+    const int grid_z_index = std::get<0>(qudratic_node_parameters);
+    const double grid_x_val = std::get<1>(qudratic_node_parameters);
+    const double grid_y_val = std::get<2>(qudratic_node_parameters);
+    const double center_of_line = std::get<3>(qudratic_node_parameters);
+
+    if (grid_z_index == 0 || grid_z_index == 4) {
+        return grid_x_val == grid_y_val && grid_y_val == center_of_line;
+    }
+
+    if (grid_z_index == 2) {
+        return grid_x_val == center_of_line || grid_y_val == center_of_line;
+    }
+
+    return false;
+}
+
+bool MathUtils::isCubicNodeIllegal(
+    const std::tuple<int, int, int>& cubic_node_parameters) {
+    const int grid_z_index = std::get<0>(cubic_node_parameters);
+    const int grid_y_index = std::get<1>(cubic_node_parameters);
+    const int grid_x_index = std::get<2>(cubic_node_parameters);
+
+    const int last_grid_x_y_z_index = 5;
+
+    if (grid_z_index == 0 || grid_z_index == last_grid_x_y_z_index) {
+        const bool first_condition = (grid_y_index != 1 && grid_y_index != 4 &&
+                                      grid_x_index != 1 && grid_x_index != 4);
+
+        const bool second_condition =
+            (grid_y_index != 2 || grid_x_index != 2) &&
+            (grid_y_index != 2 || grid_x_index != 3) &&
+            (grid_y_index != 3 || grid_x_index != 2) &&
+            (grid_y_index != 3 || grid_x_index != 3);
+
+        return !(first_condition && second_condition);
+    }
+
+    if (grid_z_index == 2 || grid_z_index == 3) {
+        return (grid_y_index != 0 && grid_y_index != last_grid_x_y_z_index) ||
+               (grid_x_index != 0 && grid_x_index != last_grid_x_y_z_index);
+    }
+
+    return true;
+}
 
 double MathUtils::calculateF(Point point) {
     const double const_right_part = 5.0;
@@ -37,7 +85,7 @@ bool MathUtils::isNumbersEqual(double first_number, double second_number,
 
 bool MathUtils::isPlane(std::vector<Point>& nodes, double average,
                         const Element& element, char axis) {
-    const auto node_indexes = element.getNodeIndexes();
+    const auto& node_indexes = element.getNodeIndexes();
 
     switch (axis) {
         case 'x':
@@ -84,7 +132,7 @@ Point MathUtils::calculateVectorCrossProduct(Point first_vector,
 
 bool MathUtils::isPointInPyramid(std::vector<Point>& nodes, const Point& point,
                                  const Element& element) {
-    const auto node_indexes = element.getNodeIndexes();
+    const auto& node_indexes = element.getNodeIndexes();
 
     Point const first_point_of_pyramid = nodes[node_indexes.at(0)];
     Point const second_point_of_pyramid = nodes[node_indexes.at(1)];
@@ -168,12 +216,53 @@ bool MathUtils::isPointInsideTetrahedron(Point point,
     return difference < epsilon;
 }
 
-double MathUtils::getLinearBasisFunctionTest(Point point, Point node_0,
-                                             Point node_1, Point node_2,
-                                             Point node_3,
-                                             int number_basis_function) {
-    Point const vertex = {0.5, 0.5, 0.5};
+double MathUtils::getBasisFunction(
+    const std::vector<Point>& nodes, Point point,
+    const std::vector<int>& node_indexes, BASIS_TYPE basis_functions_type,
+    BASIS_ELEMENT_TYPE basis_functions_elements_type,
+    int number_basis_function) {
+    switch (basis_functions_type) {
+        case BASIS_TYPE::Lagrange:
+            switch (basis_functions_elements_type) {
+                case BASIS_ELEMENT_TYPE::Linear:
+                    return getLinearBasisFunction(
+                        point, nodes[node_indexes.at(0)],
+                        nodes[node_indexes.at(1)], nodes[node_indexes.at(2)],
+                        nodes[node_indexes.at(3)], nodes[node_indexes.at(4)],
+                        number_basis_function);
+                    break;
 
+                case BASIS_ELEMENT_TYPE::Quadratic:
+                    break;
+
+                default:
+                    return 0.0;
+                    break;
+            }
+
+        case BASIS_TYPE::Hermite:
+            switch (basis_functions_elements_type) {
+                case BASIS_ELEMENT_TYPE::Cubic:
+                    break;
+
+                default:
+                    return 0.0;
+                    break;
+            }
+            break;
+
+        default:
+            return 0.0;
+            break;
+    }
+
+    return 0.0;
+}
+
+double MathUtils::getLinearBasisFunction(Point point, Point node_0,
+                                         Point node_1, Point node_2,
+                                         Point node_3, Point vertex,
+                                         int number_basis_function) {
     Point const center_of_base = {
         (node_0.x + node_1.x + node_2.x + node_3.x) / 4.0,
         (node_0.y + node_1.y + node_2.y + node_3.y) / 4.0,
@@ -250,11 +339,89 @@ double MathUtils::getLinearBasisFunctionTest(Point point, Point node_0,
     }
 }
 
-double MathUtils::getDerivativeLinearBasisFunctionTest(
-    int number_basis_function, Point point, Point node_0, Point node_1,
-    Point node_2, Point node_3, int number_derivative_parameter) {
-    Point const vertex = {0.5, 0.5, 0.5};
+double MathUtils::getQuadraticBasisFunction(Point point, Point node_0,
+                                            Point node_1, Point node_2,
+                                            Point node_3, Point vertex,
+                                            int number_basis_function) {
+    Point const center_of_base = {
+        (node_0.x + node_1.x + node_2.x + node_3.x) / 4.0,
+        (node_0.y + node_1.y + node_2.y + node_3.y) / 4.0,
+        (node_0.z + node_1.z + node_2.z + node_3.z) / 4.0};
 
+    Point const vertice_0_minus_1 = {node_1.x - node_0.x, node_1.y - node_0.y,
+                                     node_1.z - node_0.z};
+
+    Point const vertice_0_minus_4 = {node_2.x - node_0.x, node_2.y - node_0.y,
+                                     node_2.z - node_0.z};
+
+    Point const vertice_0_minus_point = {point.x, point.y, point.z};
+
+    double const norm_of_vertice_0_minus_1 =
+        vertice_0_minus_1.x * vertice_0_minus_1.x +
+        vertice_0_minus_1.y * vertice_0_minus_1.y +
+        vertice_0_minus_1.z * vertice_0_minus_1.z;
+
+    double const norm_of_vertice_0_minus_4 =
+        vertice_0_minus_4.x * vertice_0_minus_4.x +
+        vertice_0_minus_4.y * vertice_0_minus_4.y +
+        vertice_0_minus_4.z * vertice_0_minus_4.z;
+
+    double const ksi_parameter =
+        (vertice_0_minus_point.x * vertice_0_minus_1.x +
+         vertice_0_minus_point.y * vertice_0_minus_1.y +
+         vertice_0_minus_point.z * vertice_0_minus_1.z) /
+        norm_of_vertice_0_minus_1;
+
+    double const nu_parameter =
+        (vertice_0_minus_point.x * vertice_0_minus_4.x +
+         vertice_0_minus_point.y * vertice_0_minus_4.y +
+         vertice_0_minus_point.z * vertice_0_minus_4.z) /
+        norm_of_vertice_0_minus_4;
+
+    Point const vetice_vertex_minus_center = {(vertex.x - center_of_base.x),
+                                              (vertex.y - center_of_base.y),
+                                              (vertex.z - center_of_base.z)};
+
+    double const norm_of_vetice_vertex_minus_center =
+        vetice_vertex_minus_center.x * vetice_vertex_minus_center.x +
+        vetice_vertex_minus_center.y * vetice_vertex_minus_center.y +
+        vetice_vertex_minus_center.z * vetice_vertex_minus_center.z;
+
+    Point const vetice_point_minus_center = {point.x - center_of_base.x,
+                                             point.y - center_of_base.y,
+                                             point.z - center_of_base.z};
+
+    double const tetta_parameter =
+        (vetice_point_minus_center.x * vetice_vertex_minus_center.x +
+         vetice_point_minus_center.y * vetice_vertex_minus_center.y +
+         vetice_point_minus_center.z * vetice_vertex_minus_center.z) /
+        norm_of_vetice_vertex_minus_center;
+
+    switch (number_basis_function) {
+        case 0:
+            return (1 - ksi_parameter) * (1 - nu_parameter) *
+                   (1 - tetta_parameter);
+            break;
+        case 1:
+            return ksi_parameter * (1 - nu_parameter) * (1 - tetta_parameter);
+            break;
+        case 2:
+            return (1 - ksi_parameter) * nu_parameter * (1 - tetta_parameter);
+            break;
+        case 3:
+            return ksi_parameter * nu_parameter * (1 - tetta_parameter);
+            break;
+        case 4:
+            return tetta_parameter;
+            break;
+        default:
+            return 0.0;
+    }
+}
+
+double MathUtils::getDerivativeLinearBasisFunction(
+    int number_basis_function, Point point, Point node_0, Point node_1,
+    Point node_2, Point node_3, Point vertex, int number_derivative_parameter) {
     Point const center_of_base = {
         (node_0.x + node_1.x + node_2.x + node_3.x) / 4.0,
         (node_0.y + node_1.y + node_2.y + node_3.y) / 4.0,

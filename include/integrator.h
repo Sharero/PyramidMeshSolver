@@ -9,17 +9,17 @@
 
 class Integrator {
    public:
-    static double integrateBasisFunctions(
+    static double integrateForMassMatrix(
         const std::vector<Point>& nodes,
         const std::vector<Element>& finite_elements,
         const std::tuple<int, int, int>& integral_parameters);
 
-    static double integrateDerivativeBasisFunctions(
+    static double integrateForStiffnessMatrix(
         const std::vector<Point>& nodes,
         const std::vector<Element>& finite_elements,
         const std::tuple<int, int, int>& integral_parameters);
 
-    static double integrateBasisFunctionForF(
+    static double integrateForRightPartVector(
         const std::vector<Point>& nodes,
         const std::vector<Element>& finite_elements,
         const std::tuple<int, int>& integral_parameters);

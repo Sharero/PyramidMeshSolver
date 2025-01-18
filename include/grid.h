@@ -4,6 +4,10 @@
 #include <filesystem>
 #include <vector>
 
+enum class BASIS_TYPE : std::uint8_t { Lagrange, Hermite };
+
+enum class BASIS_ELEMENT_TYPE : std::uint8_t { Linear, Quadratic, Cubic };
+
 struct Point {
     double x;
     double y;
@@ -13,7 +17,7 @@ struct Point {
 class Grid {
    private:
     int count_x_points{0}, count_y_points{0}, count_z_points{0};
-    static int count_x_points1;
+
     double grid_x_step{0.0}, grid_y_step{0.0}, grid_z_step{0.0};
 
     double grid_x_scale{0.0}, grid_y_scale{0.0}, grid_z_scale{0.0};
@@ -27,6 +31,12 @@ class Grid {
     std::vector<double> grid_x;
     std::vector<double> grid_y;
     std::vector<double> grid_z;
+
+    void generateLinearData();
+
+    void generateQuadraticData();
+
+    void generateCubicData();
 
    public:
     [[nodiscard]]
@@ -43,7 +53,9 @@ class Grid {
         }
     }
 
-    void generateGrid(const std::filesystem::path& input_file_name);
+    void generateGrid(const std::filesystem::path& input_file_name,
+                      BASIS_TYPE basis_functions_type,
+                      BASIS_ELEMENT_TYPE basis_functions_elements_type);
 
     void printGridData();
 };

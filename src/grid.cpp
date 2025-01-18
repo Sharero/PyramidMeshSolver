@@ -5,7 +5,13 @@
 #include <fstream>
 #include <iostream>
 
-void Grid::generateGrid(const std::filesystem::path& input_file_name) {
+const double QUADRATIC_BASIS_STEP_DIVISOR = 4.0;
+
+const double CUBIC_BASIS_STEP_DIVISOR = 6.0;
+
+void Grid::generateGrid(const std::filesystem::path& input_file_name,
+                        BASIS_TYPE basis_functions_type,
+                        BASIS_ELEMENT_TYPE basis_functions_elements_type) {
     {
         std::ifstream input_file(input_file_name, std::ios::in);
 
@@ -17,6 +23,84 @@ void Grid::generateGrid(const std::filesystem::path& input_file_name) {
 
         input_file >> grid_x_scale >> grid_y_scale >> grid_z_scale;
     }
+
+    switch (basis_functions_type) {
+        case BASIS_TYPE::Lagrange:
+            switch (basis_functions_elements_type) {
+                case BASIS_ELEMENT_TYPE::Linear:
+                    generateLinearData();
+                    break;
+
+                case BASIS_ELEMENT_TYPE::Quadratic:
+                    generateQuadraticData();
+                    break;
+
+                case BASIS_ELEMENT_TYPE::Cubic:
+                    generateCubicData();
+                    break;
+
+                default:
+                    break;
+            }
+            break;
+
+        default:
+            generateLinearData();
+            break;
+    }
+}
+
+void Grid::generateLinearData() {
+    count_x_points = static_cast<int>(
+        (maximum_x_coordinate - minimum_x_coordinate) / grid_x_step + 1);
+
+    count_y_points = static_cast<int>(
+        (maximum_y_coordinate - minimum_y_coordinate) / grid_y_step + 1);
+
+    count_z_points = static_cast<int>(
+        (maximum_z_coordinate - minimum_z_coordinate) / grid_z_step + 1);
+
+    grid_x.resize(count_x_points);
+    grid_y.resize(count_y_points);
+    grid_z.resize(count_z_points);
+
+    const double step_x = grid_x_step;
+    const double step_y = grid_y_step;
+    const double step_z = grid_z_step;
+
+    const double minimum_x = minimum_x_coordinate;
+    const double minimum_y = minimum_y_coordinate;
+    const double minimum_z = minimum_z_coordinate;
+
+    std::transform(
+        grid_x.begin(), grid_x.end(), grid_x.begin(),
+        [step_x, minimum_x, current_index = 0](double& grid_x_value) mutable {
+            grid_x_value += current_index * step_x + minimum_x;
+            ++current_index;
+            return grid_x_value;
+        });
+
+    std::transform(
+        grid_y.begin(), grid_y.end(), grid_y.begin(),
+        [step_y, minimum_y, current_index = 0](double& grid_y_value) mutable {
+            grid_y_value += current_index * step_y + minimum_y;
+            ++current_index;
+            return grid_y_value;
+        });
+
+    std::transform(
+        grid_z.begin(), grid_z.end(), grid_z.begin(),
+        [step_z, minimum_z, current_index = 0](double& grid_z_value) mutable {
+            grid_z_value += current_index * step_z + minimum_z;
+            ++current_index;
+            return grid_z_value;
+        });
+}
+
+void Grid::generateQuadraticData() {
+    grid_x_step /= QUADRATIC_BASIS_STEP_DIVISOR;
+    grid_y_step /= QUADRATIC_BASIS_STEP_DIVISOR;
+    grid_z_step /= QUADRATIC_BASIS_STEP_DIVISOR;
 
     count_x_points = static_cast<int>(
         (maximum_x_coordinate - minimum_x_coordinate) / grid_x_step + 1);
@@ -62,6 +146,61 @@ void Grid::generateGrid(const std::filesystem::path& input_file_name) {
             ++current_index;
             return grid_z_value;
         });
+}
+
+void Grid::generateCubicData() {
+    grid_x_step /= CUBIC_BASIS_STEP_DIVISOR;
+    grid_y_step /= CUBIC_BASIS_STEP_DIVISOR;
+    grid_z_step /= CUBIC_BASIS_STEP_DIVISOR;
+
+    count_x_points = static_cast<int>(
+        (maximum_x_coordinate - minimum_x_coordinate) / grid_x_step + 1);
+
+    count_y_points = static_cast<int>(
+        (maximum_y_coordinate - minimum_y_coordinate) / grid_y_step + 1);
+
+    count_z_points = static_cast<int>(
+        (maximum_z_coordinate - minimum_z_coordinate) / grid_z_step + 1);
+
+    grid_x.resize(count_x_points);
+    grid_y.resize(count_y_points);
+    grid_z.resize(count_z_points);
+
+    const double step_x = grid_x_step;
+    const double step_y = grid_y_step;
+    const double step_z = grid_z_step;
+
+    const double minimum_x = minimum_x_coordinate;
+    const double minimum_y = minimum_y_coordinate;
+    const double minimum_z = minimum_z_coordinate;
+
+    std::transform(
+        grid_x.begin(), grid_x.end(), grid_x.begin(),
+        [step_x, minimum_x, current_index = 0](double& grid_x_value) mutable {
+            grid_x_value += current_index * step_x + minimum_x;
+            ++current_index;
+            return grid_x_value;
+        });
+
+    std::transform(
+        grid_y.begin(), grid_y.end(), grid_y.begin(),
+        [step_y, minimum_y, current_index = 0](double& grid_y_value) mutable {
+            grid_y_value += current_index * step_y + minimum_y;
+            ++current_index;
+            return grid_y_value;
+        });
+
+    std::transform(
+        grid_z.begin(), grid_z.end(), grid_z.begin(),
+        [step_z, minimum_z, current_index = 0](double& grid_z_value) mutable {
+            grid_z_value += current_index * step_z + minimum_z;
+            ++current_index;
+            return grid_z_value;
+        });
+
+    grid_x.erase(grid_x.begin() + 3);
+    grid_y.erase(grid_y.begin() + 3);
+    grid_z.erase(grid_z.begin() + 3);
 }
 
 void Grid::printGridData() {
