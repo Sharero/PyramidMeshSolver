@@ -34,18 +34,25 @@ class FEM {
     std::size_t finite_elements_count{0};
     std::size_t number_of_vertices_of_pyramid{0};
 
+    BASIS_TYPE basis_functions_type;
+    BASIS_ELEMENT_TYPE basis_functions_element_type;
+
     double lambda{1.0};
     double gamma{1.0};
 
-    void generateLinearNodes();
+    [[nodiscard]]
+    int findFaceNodeIndex(int node_1, int node_2, double divisor) const;
 
-    void generateQuadraticNodes();
+    void generateBaseNodesCombinations(
+        int combination_size, std::vector<Element>& base_nodes_combinations);
 
-    void generateCubicNodes();
+    void generateNodes(int basis_type);
+
+    void generateElements(int p);
 
     double getResultAtPoint(Point point);
 
-    void saveGridForVisualize();
+    void writeGridInformationToFile();
 
     int getFiniteElementIndex(Point point);
 
@@ -53,18 +60,24 @@ class FEM {
 
     void calculateLocalComponents(int index_of_finite_element);
 
+    void writeLocalComponentsToFiles(
+        int index_of_finite_element,
+        const std::vector<std::vector<double>>& stiffness_matrix,
+        const std::vector<std::vector<double>>& mass_matrix,
+        const std::vector<double>& right_part_vector);
+
     void assemblyGlobalComponents();
 
    public:
-    void checkBasisFunctionsToEqualsOne(
-        BASIS_TYPE basis_functions_type,
-        BASIS_ELEMENT_TYPE basis_functions_elements_type);
+    FEM(BASIS_TYPE basis_type, BASIS_ELEMENT_TYPE basis_element_type)
+        : basis_functions_type(basis_type),
+          basis_functions_element_type(basis_element_type) {}
 
-    void saveTestResults(const std::vector<Point>& test_points);
+    void checkBasisFunctionsDeltaProperty();
 
-    void generateFEMData(std::string_view const& input_file_name,
-                         BASIS_TYPE basis_functions_type,
-                         BASIS_ELEMENT_TYPE basis_functions_elements_type);
+    void calculateResultAtPointsToFile(const std::vector<Point>& test_points);
+
+    void generateFEMData(std::string_view const& input_file_name);
 
     void inputBoundaryConditions(std::string_view const& input_file_name);
 

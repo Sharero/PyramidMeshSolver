@@ -1,5 +1,6 @@
 #include "../include/integrator.h"
 
+#include <iostream>
 #include <tuple>
 #include <vector>
 
@@ -7,227 +8,187 @@
 #include "../include/grid.h"
 #include "../include/mathUtils.h"
 
-const double INTEGRAL_NORMALIZATION_FACTOR = 0.5;
-
 double Integrator::integrateForMassMatrix(
     const std::vector<Point>& nodes,
     const std::vector<Element>& finite_elements,
-    const std::tuple<int, int, int>& integral_parameters) {
-    int const count_of_segments = 20;
-
-    int const index_of_element = std::get<0>(integral_parameters);
-    int const index_of_first_basis_function = std::get<1>(integral_parameters);
-    int const index_of_second_basis_function = std::get<2>(integral_parameters);
-
-    double const x_integral_step = 1.0 / count_of_segments;
-    double const y_integral_step = 1.0 / count_of_segments;
-    double const z_integral_step = 1.0 / count_of_segments;
+    const std::tuple<int, int, int>& integral_parameters,
+    BASIS_TYPE basis_functions_type,
+    BASIS_ELEMENT_TYPE basis_functions_element_type) {
+    const int index_of_element = std::get<0>(integral_parameters);
+    const int index_of_first_basis_function = std::get<1>(integral_parameters);
+    const int index_of_second_basis_function = std::get<2>(integral_parameters);
 
     const auto node_indexes =
         finite_elements[index_of_element].getNodeIndexes();
 
-    double integral = 0.0;
+    Point node_0, node_1, node_2, node_3, vertex;
 
-    for (int i = 0; i <= count_of_segments; i++) {
-        for (int j = 0; j <= count_of_segments; j++) {
-#pragma unroll 4
-            for (int k = 0; k <= count_of_segments; k++) {
-                Point const point = {nodes[0].x + k * x_integral_step,
-                                     nodes[0].y + j * y_integral_step,
-                                     nodes[0].z + i * z_integral_step};
+    MathUtils::getMainPyramideNodes(node_indexes, nodes, basis_functions_type,
+                                    basis_functions_element_type, node_0,
+                                    node_1, node_2, node_3, vertex);
 
-                double weight = 1.0;
+    const std::vector<double> gauss_nodes = {
+        0.025446, 0.129234, 0.297077, 0.500000, 0.702923, 0.870766, 0.974553};
 
-                if (i == 0 || i == count_of_segments) {
-                    weight *= INTEGRAL_NORMALIZATION_FACTOR;
-                }
+    const std::vector<double> gauss_weights = {
+        0.064742, 0.139853, 0.190915, 0.208980, 0.190915, 0.139853, 0.064742};
 
-                if (j == 0 || j == count_of_segments) {
-                    weight *= INTEGRAL_NORMALIZATION_FACTOR;
-                }
+    double result = 0.0;
 
-                if (k == 0 || k == count_of_segments) {
-                    weight *= INTEGRAL_NORMALIZATION_FACTOR;
-                }
+    for (int zi_idx = 0; zi_idx < gauss_nodes.size(); ++zi_idx) {
+        double z = gauss_nodes[zi_idx];
+        double w_z = gauss_weights[zi_idx];
 
-                integral +=
-                    weight *
-                    MathUtils::getLinearBasisFunction(
-                        point, nodes[node_indexes.at(0)],
-                        nodes[node_indexes.at(1)], nodes[node_indexes.at(2)],
-                        nodes[node_indexes.at(3)], nodes[nodes.size() - 1],
-                        index_of_first_basis_function) *
-                    MathUtils::getLinearBasisFunction(
-                        point, nodes[node_indexes.at(0)],
-                        nodes[node_indexes.at(1)], nodes[node_indexes.at(2)],
-                        nodes[node_indexes.at(3)], nodes[nodes.size() - 1],
-                        index_of_second_basis_function);
+        double L = 1.0 - z;
+        double a = z / 2.0;
+
+        for (int xi_idx = 0; xi_idx < gauss_nodes.size(); ++xi_idx) {
+            double x = a + L * gauss_nodes[xi_idx];
+            double w_x = L * gauss_weights[xi_idx];
+
+            for (int yi_idx = 0; yi_idx < gauss_nodes.size(); ++yi_idx) {
+                double y = a + L * gauss_nodes[yi_idx];
+                double w_y = L * gauss_weights[yi_idx];
+
+                result +=
+                    MathUtils::getBasisFunction(
+                        nodes, {x, y, z}, node_indexes, basis_functions_type,
+                        basis_functions_element_type,
+                        index_of_first_basis_function, false) *
+                    MathUtils::getBasisFunction(
+                        nodes, {x, y, z}, node_indexes, basis_functions_type,
+                        basis_functions_element_type,
+                        index_of_second_basis_function, false) *
+                    w_x * w_y * w_z;
             }
         }
     }
 
-    integral *= x_integral_step * y_integral_step * z_integral_step;
+    std::vector<std::vector<double>> J(3, std::vector<double>(3));
 
-    return integral;
+    MathUtils::calculateJacobiMatrix(node_0, node_1, node_2, node_3, vertex, J);
+
+    const double determinant = MathUtils::calculateJacobian(J);
+
+    return std::abs(determinant) * result;
 }
 
 double Integrator::integrateForRightPartVector(
     const std::vector<Point>& nodes,
     const std::vector<Element>& finite_elements,
-    const std::tuple<int, int>& integral_parameters) {
-    int const count_of_segments = 20;
-
+    const std::tuple<int, int>& integral_parameters,
+    BASIS_TYPE basis_functions_type,
+    BASIS_ELEMENT_TYPE basis_functions_element_type) {
     int const index_of_element = std::get<0>(integral_parameters);
     int const index_of_basis_function = std::get<1>(integral_parameters);
-
-    double const x_integral_step = 1.0 / count_of_segments;
-    double const y_integral_step = 1.0 / count_of_segments;
-    double const z_integral_step = 1.0 / count_of_segments;
 
     const auto node_indexes =
         finite_elements[index_of_element].getNodeIndexes();
 
-    double integral = 0.0;
+    Point node_0, node_1, node_2, node_3, vertex;
 
-    for (int i = 0; i <= count_of_segments; i++) {
-        for (int j = 0; j <= count_of_segments; j++) {
-#pragma unroll 4
-            for (int k = 0; k <= count_of_segments; k++) {
-                Point const point = {nodes[0].x + k * x_integral_step,
-                                     nodes[0].y + j * y_integral_step,
-                                     nodes[0].z + i * z_integral_step};
+    MathUtils::getMainPyramideNodes(node_indexes, nodes, basis_functions_type,
+                                    basis_functions_element_type, node_0,
+                                    node_1, node_2, node_3, vertex);
 
-                double weight = 1.0;
+    const std::vector<double> gauss_nodes = {
+        0.025446, 0.129234, 0.297077, 0.500000, 0.702923, 0.870766, 0.974553};
 
-                if (i == 0 || i == count_of_segments) {
-                    weight *= INTEGRAL_NORMALIZATION_FACTOR;
-                }
+    const std::vector<double> gauss_weights = {
+        0.064742, 0.139853, 0.190915, 0.208980, 0.190915, 0.139853, 0.064742};
 
-                if (j == 0 || j == count_of_segments) {
-                    weight *= INTEGRAL_NORMALIZATION_FACTOR;
-                }
+    double result = 0.0;
 
-                if (k == 0 || k == count_of_segments) {
-                    weight *= INTEGRAL_NORMALIZATION_FACTOR;
-                }
+    for (int zi_idx = 0; zi_idx < gauss_nodes.size(); ++zi_idx) {
+        double z = gauss_nodes[zi_idx];
+        double w_z = gauss_weights[zi_idx];
 
-                integral +=
-                    weight *
-                    MathUtils::getLinearBasisFunction(
-                        point, nodes[node_indexes.at(0)],
-                        nodes[node_indexes.at(1)], nodes[node_indexes.at(2)],
-                        nodes[node_indexes.at(3)], nodes[nodes.size() - 1],
-                        index_of_basis_function) *
-                    MathUtils::calculateF(point);
+        double L = 1.0 - z;
+        double a = z / 2.0;
+
+        for (int xi_idx = 0; xi_idx < gauss_nodes.size(); ++xi_idx) {
+            double x = a + L * gauss_nodes[xi_idx];
+            double w_x = L * gauss_weights[xi_idx];
+
+            for (int yi_idx = 0; yi_idx < gauss_nodes.size(); ++yi_idx) {
+                double y = a + L * gauss_nodes[yi_idx];
+                double w_y = L * gauss_weights[yi_idx];
+
+                double physical_x = 0.0;
+                double physical_y = 0.0;
+                double physical_z = 0.0;
+
+                MathUtils::calculatePhysicalCoordinates(
+                    {x, y, z}, node_0, node_1, node_2, node_3, vertex,
+                    physical_x, physical_y, physical_z);
+
+                result +=
+                    MathUtils::calculateF(
+                        {physical_x, physical_y, physical_z}) *
+                    MathUtils::getBasisFunction(
+                        nodes, {x, y, z}, node_indexes, basis_functions_type,
+                        basis_functions_element_type, index_of_basis_function,
+                        false) *
+                    w_x * w_y * w_z;
             }
         }
     }
 
-    integral *= x_integral_step * y_integral_step * z_integral_step;
+    std::vector<std::vector<double>> J(3, std::vector<double>(3));
 
-    return integral;
+    MathUtils::calculateJacobiMatrix(node_0, node_1, node_2, node_3, vertex, J);
+
+    const double determinant = MathUtils::calculateJacobian(J);
+
+    return std::abs(determinant) * result;
 }
 
 double Integrator::integrateForStiffnessMatrix(
     const std::vector<Point>& nodes,
     const std::vector<Element>& finite_elements,
-    const std::tuple<int, int, int>& integral_parameters) {
-    int const count_of_segments = 20;
-
+    const std::tuple<int, int, int>& integral_parameters,
+    BASIS_TYPE basis_functions_type,
+    BASIS_ELEMENT_TYPE basis_functions_element_type) {
     int const index_of_element = std::get<0>(integral_parameters);
     int const index_of_first_basis_function = std::get<1>(integral_parameters);
     int const index_of_second_basis_function = std::get<2>(integral_parameters);
 
-    double const x_integral_step = 1.0 / count_of_segments;
-    double const y_integral_step = 1.0 / count_of_segments;
-    double const z_integral_step = 1.0 / count_of_segments;
-
-    double first_integral_component = 0.0;
-    double second_integral_component = 0.0;
-    double third_integral_component = 0.0;
-    double fourth_integral_component = 0.0;
-    double fifth_integral_component = 0.0;
-    double sixth_integral_component = 0.0;
-
     const auto node_indexes =
         finite_elements[index_of_element].getNodeIndexes();
 
-    double integral = 0.0;
+    const std::vector<double> gauss_nodes = {
+        0.025446, 0.129234, 0.297077, 0.500000, 0.702923, 0.870766, 0.974553};
 
-    for (int i = 0; i <= count_of_segments; i++) {
-        for (int j = 0; j <= count_of_segments; j++) {
-#pragma unroll 4
-            for (int k = 0; k <= count_of_segments; k++) {
-                Point const point = {nodes[0].x + k * x_integral_step,
-                                     nodes[0].y + j * y_integral_step,
-                                     nodes[0].z + i * z_integral_step};
+    const std::vector<double> gauss_weights = {
+        0.064742, 0.139853, 0.190915, 0.208980, 0.190915, 0.139853, 0.064742};
 
-                double weight = 1.0;
+    double result = 0.0;
 
-                if (i == 0 || i == count_of_segments) {
-                    weight *= INTEGRAL_NORMALIZATION_FACTOR;
-                }
+    for (int zi_idx = 0; zi_idx < gauss_nodes.size(); ++zi_idx) {
+        double z = gauss_nodes[zi_idx];
+        double w_z = gauss_weights[zi_idx];
 
-                if (j == 0 || j == count_of_segments) {
-                    weight *= INTEGRAL_NORMALIZATION_FACTOR;
-                }
+        double L = 1.0 - z;
+        double a = z / 2.0;
 
-                if (k == 0 || k == count_of_segments) {
-                    weight *= INTEGRAL_NORMALIZATION_FACTOR;
-                }
+        for (int xi_idx = 0; xi_idx < gauss_nodes.size(); ++xi_idx) {
+            double x = a + L * gauss_nodes[xi_idx];
+            double w_x = L * gauss_weights[xi_idx];
 
-                second_integral_component =
-                    MathUtils::getDerivativeLinearBasisFunction(
-                        index_of_second_basis_function, point,
-                        nodes[node_indexes.at(0)], nodes[node_indexes.at(1)],
-                        nodes[node_indexes.at(2)], nodes[node_indexes.at(3)],
-                        nodes[nodes.size() - 1], 0);
+            for (int yi_idx = 0; yi_idx < gauss_nodes.size(); ++yi_idx) {
+                double y = a + L * gauss_nodes[yi_idx];
+                double w_y = L * gauss_weights[yi_idx];
 
-                fourth_integral_component =
-                    MathUtils::getDerivativeLinearBasisFunction(
-                        index_of_second_basis_function, point,
-                        nodes[node_indexes.at(0)], nodes[node_indexes.at(1)],
-                        nodes[node_indexes.at(2)], nodes[node_indexes.at(3)],
-                        nodes[nodes.size() - 1], 1);
-
-                sixth_integral_component =
-                    MathUtils::getDerivativeLinearBasisFunction(
-                        index_of_second_basis_function, point,
-                        nodes[node_indexes.at(0)], nodes[node_indexes.at(1)],
-                        nodes[node_indexes.at(2)], nodes[node_indexes.at(3)],
-                        nodes[nodes.size() - 1], 2);
-
-                first_integral_component =
-                    MathUtils::getDerivativeLinearBasisFunction(
-                        index_of_first_basis_function, point,
-                        nodes[node_indexes.at(0)], nodes[node_indexes.at(1)],
-                        nodes[node_indexes.at(2)], nodes[node_indexes.at(3)],
-                        nodes[nodes.size() - 1], 0);
-
-                third_integral_component =
-                    MathUtils::getDerivativeLinearBasisFunction(
-                        index_of_first_basis_function, point,
-                        nodes[node_indexes.at(0)], nodes[node_indexes.at(1)],
-                        nodes[node_indexes.at(2)], nodes[node_indexes.at(3)],
-                        nodes[nodes.size() - 1], 1);
-
-                fifth_integral_component =
-                    MathUtils::getDerivativeLinearBasisFunction(
-                        index_of_first_basis_function, point,
-                        nodes[node_indexes.at(0)], nodes[node_indexes.at(1)],
-                        nodes[node_indexes.at(2)], nodes[node_indexes.at(3)],
-                        nodes[nodes.size() - 1], 2);
-
-                integral +=
-                    weight *
-                    (first_integral_component * second_integral_component +
-                     third_integral_component * fourth_integral_component +
-                     fifth_integral_component * sixth_integral_component);
+                result +=
+                    MathUtils::getDerivativeBasisFunction(
+                        nodes, {x, y, z}, node_indexes, basis_functions_type,
+                        basis_functions_element_type,
+                        index_of_first_basis_function,
+                        index_of_second_basis_function, false) *
+                    w_x * w_y * w_z;
             }
         }
     }
 
-    integral *= x_integral_step * y_integral_step * z_integral_step;
-
-    return integral;
+    return result;
 }

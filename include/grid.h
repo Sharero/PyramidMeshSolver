@@ -4,14 +4,22 @@
 #include <filesystem>
 #include <vector>
 
-enum class BASIS_TYPE : std::uint8_t { Lagrange, Hermite };
+enum class BASIS_TYPE : std::uint8_t { Lagrange, Hierarhical };
 
 enum class BASIS_ELEMENT_TYPE : std::uint8_t { Linear, Quadratic, Cubic };
+
+const double NUMBERS_EQUAL_EPSILON = 1e-15;
 
 struct Point {
     double x;
     double y;
     double z;
+
+    bool operator==(Point const& o) const noexcept {
+        return std::abs(x - o.x) < NUMBERS_EQUAL_EPSILON &&
+               std::abs(y - o.y) < NUMBERS_EQUAL_EPSILON &&
+               std::abs(z - o.z) < NUMBERS_EQUAL_EPSILON;
+    }
 };
 
 class Grid {

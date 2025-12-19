@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <iomanip>
 #include <iostream>
 #include <set>
@@ -20,13 +21,23 @@ static constexpr std::string_view RESULT_OUTPUT_FILE_NAME =
     "../data/output/result.txt";
 
 const double MIDPOINT_DIVISOR = 2.0;
+const double THIRD_DIVISOR = 3.0;
+
+const int COUNT_BASE_NODES_AT_LINEAR_COMBINATION = 4;
+const int COUNT_BASE_NODES_AT_QUADRATIC_COMBINATION = 9;
+const int COUNT_BASE_NODES_AT_CUBIC_COMBINATION = 16;
 
 int FEM::getFiniteElementIndex(Point point) {
-    int position = -1;
+    int position = 0;
 
-#pragma unroll 4
-    for (int i = 0; i < finite_elements.size(); ++i) {
-        if (MathUtils::isPointInPyramid(nodes, point, finite_elements[i])) {
+    double d[6] = {point.z,     point.y,     point.x,
+                   1 - point.y, 1 - point.x, 1 - point.z};
+
+    double dmin = d[0];
+
+    for (int i = 1; i < 6; ++i) {
+        if (d[i] < dmin) {
+            dmin = d[i];
             position = i;
         }
     }
@@ -47,53 +58,213 @@ double FEM::getResultAtPoint(Point point) {
 #pragma unroll 4
     for (int i = 0; i < number_of_vertices_of_pyramid; i++) {
         result += slae_result[node_indexes.at(i)] *
-                  MathUtils::getLinearBasisFunction(
-                      point, nodes[node_indexes.at(0)],
-                      nodes[node_indexes.at(1)], nodes[node_indexes.at(2)],
-                      nodes[node_indexes.at(3)], nodes[nodes.size() - 1], i);
+                  MathUtils::getBasisFunction(
+                      nodes, point, node_indexes, basis_functions_type,
+                      basis_functions_element_type, i, true);
     }
 
     return result;
 }
 
-void FEM::generateLinearNodes() {
-    const std::vector<double> grid_x = mesh.getGridData('x');
-    const std::vector<double> grid_y = mesh.getGridData('y');
-    const std::vector<double> grid_z = mesh.getGridData('z');
+int FEM::findFaceNodeIndex(int node_1, int node_2, double divisor) const {
+    double alpha = 0.0;
+    double beta = 0.0;
 
-    const Point pyramid_height = {(grid_x[1] + grid_x[0]) / MIDPOINT_DIVISOR,
-                                  (grid_y[1] + grid_y[0]) / MIDPOINT_DIVISOR,
-                                  (grid_z[1] + grid_z[0]) / MIDPOINT_DIVISOR};
+    if (divisor == MIDPOINT_DIVISOR) {
+        alpha = 1.0;
+        beta = 1.0;
+    } else if (divisor == THIRD_DIVISOR) {
+        alpha = 1.0;
+        beta = 2.0;
+    } else if (divisor == MIDPOINT_DIVISOR * THIRD_DIVISOR) {
+        alpha = 1.0;
+        beta = 5.0;
+    }
 
-    for (const double& z_element : grid_z) {
-        for (const double& y_element : grid_y) {
+    const Point desired_point = {
+        (alpha * nodes[node_1].x + beta * nodes[node_2].x) / divisor,
+        (alpha * nodes[node_1].y + beta * nodes[node_2].y) / divisor,
+        (alpha * nodes[node_1].z + beta * nodes[node_2].z) / divisor};
+
 #pragma unroll 4
-            for (const double& x_element : grid_x) {
-                nodes.push_back({x_element, y_element, z_element});
-            }
+    for (size_t i = 0; i < nodes.size(); ++i) {
+        if (nodes[i] == desired_point) {
+            return static_cast<int>(i);
         }
     }
 
-    nodes.push_back(pyramid_height);
+    return -1;
 }
 
-void FEM::generateQuadraticNodes() {
-    const std::vector<double> grid_x = mesh.getGridData('x');
-    const std::vector<double> grid_y = mesh.getGridData('y');
-    const std::vector<double> grid_z = mesh.getGridData('z');
+void FEM::generateBaseNodesCombinations(
+    int combination_size, std::vector<Element>& base_nodes_combinations) {
+    int const vertex_index = static_cast<int>(nodes.size()) - 1;
 
-    const Point pyramid_height = {(grid_x[4] + grid_x[0]) / MIDPOINT_DIVISOR,
-                                  (grid_y[4] + grid_y[0]) / MIDPOINT_DIVISOR,
-                                  (grid_z[4] + grid_z[0]) / MIDPOINT_DIVISOR};
+    std::set<int> forbidden_indexes;
+    std::vector<std::set<int>> required_indexes_sets;
 
-    const double center_of_line = 0.5;
+    switch (combination_size) {
+        case COUNT_BASE_NODES_AT_LINEAR_COMBINATION: {
+            const int right_top_index = 5;
+
+            forbidden_indexes = {};
+
+            required_indexes_sets = {
+                {0, 1}, {0, 2}, {2, 3}, {1, 3}, {4, right_top_index}};
+
+            break;
+        }
+        case COUNT_BASE_NODES_AT_QUADRATIC_COMBINATION: {
+            const std::vector<int> first_forbidden_layer_indexes = {9, 10, 11,
+                                                                    12};
+            const std::vector<int> second_forbidden_layer_indexes = {21, 22, 23,
+                                                                     24};
+            const std::set<int> first_plane_start_indexes = {0, 1, 2};
+            const std::set<int> second_plane_start_indexes = {0, 3, 6};
+            const std::set<int> third_plane_start_indexes = {6, 7, 8};
+            const std::set<int> fourth_plane_start_indexes = {2, 5, 8};
+            const std::set<int> fifth_plane_start_indexes = {25, 26, 27};
+
+#pragma unroll 4
+            for (const auto index : first_forbidden_layer_indexes) {
+                forbidden_indexes.insert(index);
+            }
+
+#pragma unroll 4
+            for (const auto index : second_forbidden_layer_indexes) {
+                forbidden_indexes.insert(index);
+            }
+
+            required_indexes_sets = {
+                first_plane_start_indexes, second_plane_start_indexes,
+                third_plane_start_indexes, fourth_plane_start_indexes,
+                fifth_plane_start_indexes};
+
+            break;
+        }
+        default: {
+            forbidden_indexes = {};
+            required_indexes_sets = {};
+            break;
+        }
+    }
+
+#pragma unroll 4
+    for (const auto& required_indexes : required_indexes_sets) {
+        std::vector<int> remaining_indexes;
+
+        MathUtils::filterRemainingIndexesForBaseCombinations(
+            vertex_index, forbidden_indexes, required_indexes,
+            remaining_indexes);
+
+        MathUtils::calculateCombinations(combination_size, required_indexes,
+                                         remaining_indexes,
+                                         base_nodes_combinations);
+    }
+}
+
+void FEM::generateElements(int p) {
+    int const vertex_index = (int)nodes.size() - 1;
+    int const baseN = p + 1;
+    int const baseCount = baseN * baseN;
+
+    std::array<int, 4> corner = {0, baseN - 1, baseN * (baseN - 1),
+                                 baseCount - 1};
+
+    std::vector<Element> base_combs;
+
+    generateBaseNodesCombinations(baseCount, base_combs);
+
+    for (auto& comb : base_combs) {
+        auto node_idxs = comb.getNodeIndexes();
+
+        double avgZ = 0;
+        double avgY = 0;
+        double avgX = 0;
+
+        for (int idx : node_idxs) {
+            avgX += nodes[idx].x;
+            avgY += nodes[idx].y;
+            avgZ += nodes[idx].z;
+        }
+
+        avgX /= baseCount;
+        avgY /= baseCount;
+        avgZ /= baseCount;
+
+        if (!(MathUtils::isPlane(nodes, avgZ, comb, 'z') ||
+              MathUtils::isPlane(nodes, avgY, comb, 'y') ||
+              MathUtils::isPlane(nodes, avgX, comb, 'x')))
+            continue;
+
+        std::vector<int> elem_idxs;
+
+        for (auto index : node_idxs) {
+            elem_idxs.push_back(index);
+        }
+
+        for (int n = 1; n < p; ++n) {
+            for (int c : corner) {
+                elem_idxs.push_back(findFaceNodeIndex(
+                    node_idxs[c], vertex_index, n * MIDPOINT_DIVISOR));
+            }
+        }
+
+        elem_idxs.push_back(vertex_index);
+
+        Element E;
+        E.setNodeIndexes(elem_idxs);
+        finite_elements.push_back(std::move(E));
+    }
+}
+
+void FEM::generateNodes(int basis_type) {
+    const auto grid_x = mesh.getGridData('x');
+    const auto grid_y = mesh.getGridData('y');
+    const auto grid_z = mesh.getGridData('z');
+
+    int stride = 0;
+    int lastGridIndex = 0;
+
+    switch (basis_type) {
+        case 1:
+            stride = 1;
+            lastGridIndex = 1;
+            break;
+        case 2:
+            stride = 2;
+            lastGridIndex = 4;
+            break;
+        case 3:
+            stride = 1;
+            lastGridIndex = 5;
+            break;
+        default:
+            break;
+    }
+
+    Point pyramid_height = {
+        (grid_x[lastGridIndex] + grid_x[0]) / MIDPOINT_DIVISOR,
+        (grid_y[lastGridIndex] + grid_y[0]) / MIDPOINT_DIVISOR,
+        (grid_z[lastGridIndex] + grid_z[0]) / MIDPOINT_DIVISOR};
+
+    auto illegal = [&](int i, int j, int k) {
+        if (basis_type == 3) {
+            return MathUtils::isCubicNodeIllegal(std::make_tuple(i, j, k));
+        } else if (basis_type == 2) {
+            return grid_x[k] == 0.5 && grid_y[j] == 0.5 && grid_z[i] == 0.5;
+        }
+        return false;
+    };
 
     for (int i = 0; i < grid_z.size(); ++i) {
-        for (int j = (i % 2); j < grid_y.size(); j += 2) {
-#pragma unroll 4
-            for (int k = (i % 2); k < grid_x.size(); k += 2) {
-                if (!MathUtils::isQudraticNodeIllegal(std::make_tuple(
-                        i, grid_x[k], grid_y[j], center_of_line))) {
+        int jStart = (basis_type == 2 ? (i % stride) : 0);
+
+        for (int j = jStart; j < grid_y.size(); j += stride) {
+            int kStart = (basis_type == 2 ? (i % stride) : 0);
+
+            for (int k = kStart; k < grid_x.size(); k += stride) {
+                if (!illegal(i, j, k)) {
                     nodes.push_back({grid_x[k], grid_y[j], grid_z[i]});
                 }
             }
@@ -103,114 +274,62 @@ void FEM::generateQuadraticNodes() {
     nodes.push_back(pyramid_height);
 }
 
-void FEM::generateCubicNodes() {
-    const std::vector<double> grid_x = mesh.getGridData('x');
-    const std::vector<double> grid_y = mesh.getGridData('y');
-    const std::vector<double> grid_z = mesh.getGridData('z');
-
-    const Point pyramid_height = {(grid_x[5] + grid_x[0]) / MIDPOINT_DIVISOR,
-                                  (grid_y[5] + grid_y[0]) / MIDPOINT_DIVISOR,
-                                  (grid_z[5] + grid_z[0]) / MIDPOINT_DIVISOR};
-
-    for (int i = 0; i < grid_z.size(); ++i) {
-        for (int j = 0; j < grid_y.size(); j++) {
-#pragma unroll 4
-            for (int k = 0; k < grid_x.size(); k++) {
-                if (k == 0 && (i == 1 || i == 4)) {
-                    if (j == 1 || j == 4) {
-                        nodes.push_back({grid_x[1], grid_y[j], grid_z[i]});
-                        nodes.push_back({grid_x[4], grid_y[j], grid_z[i]});
-                    } else if (j != 0 && j != grid_z.size() - 1) {
-                        nodes.push_back({grid_x[2], grid_y[j], grid_z[i]});
-                        nodes.push_back({grid_x[3], grid_y[j], grid_z[i]});
-                    }
-                } else if (!MathUtils::isCubicNodeIllegal(
-                               std::make_tuple(i, j, k))) {
-                    nodes.push_back({grid_x[k], grid_y[j], grid_z[i]});
-                }
-            }
-        }
-    }
-
-    nodes.push_back(pyramid_height);
-}
-
-void FEM::generateFEMData(std::string_view const& input_file_name,
-                          BASIS_TYPE basis_functions_type,
-                          BASIS_ELEMENT_TYPE basis_functions_elements_type) {
+void FEM::generateFEMData(std::string_view const& input_file_name) {
     std::filesystem::path const file_name = input_file_name;
 
     mesh.generateGrid(file_name, basis_functions_type,
-                      basis_functions_elements_type);
+                      basis_functions_element_type);
 
     switch (basis_functions_type) {
         case BASIS_TYPE::Lagrange:
-            switch (basis_functions_elements_type) {
+            switch (basis_functions_element_type) {
                 case BASIS_ELEMENT_TYPE::Linear:
-                    generateLinearNodes();
+                    generateNodes(1);
+                    generateElements(1);
                     break;
-
                 case BASIS_ELEMENT_TYPE::Quadratic:
-                    generateQuadraticNodes();
+                    generateNodes(2);
+                    generateElements(2);
                     break;
-
                 case BASIS_ELEMENT_TYPE::Cubic:
-                    generateCubicNodes();
+                    generateNodes(3);
+                    finite_elements = {
+                        {0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11, 12,
+                         13, 14, 15, 16, 17, 18, 19, 25, 26, 29, 30, 72},
+                        {0,  1,  2,  3,  20, 21, 22, 23, 36, 37, 38, 39, 56,
+                         57, 58, 59, 16, 17, 52, 53, 25, 26, 41, 42, 72},
+                        {0,  4,  8,  12, 20, 24, 28, 32, 36, 40, 44, 48, 56,
+                         60, 64, 68, 16, 18, 52, 54, 25, 29, 41, 45, 72},
+                        {12, 13, 14, 15, 32, 33, 34, 35, 48, 49, 50, 51, 68,
+                         69, 70, 71, 18, 19, 54, 55, 29, 30, 45, 46, 72},
+                        {3,  7,  11, 15, 23, 27, 31, 35, 39, 43, 47, 51, 59,
+                         63, 67, 71, 17, 19, 53, 55, 26, 30, 42, 46, 72},
+                        {56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68,
+                         69, 70, 71, 52, 53, 54, 55, 41, 42, 45, 46, 72}};
                     break;
-
                 default:
                     break;
             }
             break;
-
+        case BASIS_TYPE::Hierarhical:
+            switch (basis_functions_element_type) {
+                case BASIS_ELEMENT_TYPE::Quadratic:
+                    generateNodes(2);
+                    generateElements(2);
+                    break;
+                case BASIS_ELEMENT_TYPE::Cubic:
+                    generateNodes(1);
+                    generateElements(1);
+                    break;
+                default:
+                    break;
+            }
+            break;
         default:
-            generateLinearNodes();
             break;
     }
 
-    int const vertex_index = static_cast<int>(nodes.size()) - 1;
-    int const current_element_index = 0;
-
-    for (int node_1 = 0; node_1 < vertex_index; ++node_1) {
-        for (int node_2 = node_1 + 1; node_2 < vertex_index; ++node_2) {
-            for (int node_3 = node_2 + 1; node_3 < vertex_index; ++node_3) {
-#pragma unroll 4
-                for (int node_4 = node_3 + 1; node_4 < vertex_index; ++node_4) {
-                    double const average_z_coordinate =
-                        (nodes[node_1].z + nodes[node_2].z + nodes[node_3].z +
-                         nodes[node_4].z) /
-                        4.0;
-
-                    bool const is_z_plane = MathUtils::isPlane(
-                        nodes, average_z_coordinate,
-                        {node_1, node_2, node_3, node_4}, 'z');
-
-                    double const average_x_coordinate =
-                        (nodes[node_1].x + nodes[node_2].x + nodes[node_3].x +
-                         nodes[node_4].x) /
-                        4.0;
-
-                    bool const is_x_plane = MathUtils::isPlane(
-                        nodes, average_x_coordinate,
-                        {node_1, node_2, node_3, node_4}, 'x');
-
-                    double const average_y_coordinate =
-                        (nodes[node_1].y + nodes[node_2].y + nodes[node_3].y +
-                         nodes[node_4].y) /
-                        4.0;
-
-                    bool const is_y_plane = MathUtils::isPlane(
-                        nodes, average_y_coordinate,
-                        {node_1, node_2, node_3, node_4}, 'y');
-
-                    if (is_z_plane || is_x_plane || is_y_plane) {
-                        finite_elements.emplace_back(Element(
-                            {node_1, node_2, node_3, node_4, vertex_index}));
-                    }
-                }
-            }
-        }
-    }
+    writeGridInformationToFile();
 
     number_of_vertices_of_pyramid = finite_elements[0].getNodeIndexes().size();
 
@@ -227,8 +346,6 @@ void FEM::generateFEMData(std::string_view const& input_file_name,
         std::vector<double>(number_of_vertices_of_pyramid));
 
     right_part_local.resize(number_of_vertices_of_pyramid);
-
-    saveGridForVisualize();
 }
 
 void FEM::inputBoundaryConditions(std::string_view const& input_file_name) {
@@ -242,11 +359,36 @@ void FEM::inputBoundaryConditions(std::string_view const& input_file_name) {
 
         first_boundary_condition_nodes.resize(count_first_condition_nodes);
 
+        std::vector<int> global_vertexes = {0, 2, 6, 8, 25, 27, 31, 33};
+        std::vector<std::array<int, 3>> global_edges = {
+            {0, 1, 2},    {3, 4, 5},    {6, 7, 8},    {13, 14, 15},
+            {18, 19, 20}, {25, 26, 27}, {28, 29, 30}, {31, 32, 33},
+            {0, 3, 6},    {2, 5, 8},    {13, 16, 18}, {15, 17, 20},
+            {25, 28, 31}, {27, 30, 33}};
+
 #pragma unroll 4
         for (int i = 0; i < count_first_condition_nodes; i++) {
             input_boundaries >> first_boundary_condition_nodes[i].first;
-            first_boundary_condition_nodes[i].second = MathUtils::calculateU(
-                nodes[first_boundary_condition_nodes[i].first]);
+            if (find(global_vertexes.begin(), global_vertexes.end(),
+                     first_boundary_condition_nodes[i].first) !=
+                global_vertexes.end()) {
+                first_boundary_condition_nodes[i].second =
+                    MathUtils::calculateU(
+                        nodes[first_boundary_condition_nodes[i].first]);
+            } else {
+                for (auto edge : global_edges) {
+                    if (edge.at(1) == first_boundary_condition_nodes[i].first) {
+                        double value_0 =
+                            MathUtils::calculateU(nodes[edge.at(0)]);
+                        double value_1 =
+                            MathUtils::calculateU(nodes[edge.at(2)]);
+                        double value_2 =
+                            MathUtils::calculateU(nodes[edge.at(1)]);
+                        first_boundary_condition_nodes[i].second =
+                            value_2 - (value_0 + value_1) / 2.0;
+                    }
+                }
+            }
         }
     }
 }
@@ -257,11 +399,14 @@ void FEM::generatePortrait() {
     std::vector<std::set<int>> connections(nodes_count);
 
     for (int i = 0; i < finite_elements_count; i++) {
+        const auto node_indexes = finite_elements[i].getNodeIndexes();
         for (int j = 0; j < number_of_vertices_of_pyramid; j++) {
-#pragma unroll 4
-            for (int k = 0; k < j; k++) {
-                const auto node_indexes = finite_elements[i].getNodeIndexes();
-                connections[node_indexes.at(k)].insert(node_indexes.at(j));
+            const int index_1 = node_indexes.at(j);
+            for (int k = 0; k < number_of_vertices_of_pyramid; k++) {
+                const int index_2 = node_indexes.at(k);
+                if (index_1 < index_2) {
+                    connections[index_1].insert(index_2);
+                }
             }
         }
     }
@@ -281,25 +426,40 @@ void FEM::generatePortrait() {
 void FEM::calculateLocalComponents(int index_of_finite_element) {
     for (int i = 0; i < number_of_vertices_of_pyramid; i++) {
 #pragma unroll 4
-        for (int j = 0; j < number_of_vertices_of_pyramid; j++) {
+        for (int j = i; j < number_of_vertices_of_pyramid; j++) {
             stiffness_matrix_local[i][j] =
                 lambda * Integrator::integrateForStiffnessMatrix(
                              nodes, finite_elements,
-                             std::make_tuple(index_of_finite_element, i, j));
+                             std::make_tuple(index_of_finite_element, i, j),
+                             basis_functions_type,
+                             basis_functions_element_type);
 
             mass_matrix_local[i][j] =
                 gamma * Integrator::integrateForMassMatrix(
                             nodes, finite_elements,
-                            std::make_tuple(index_of_finite_element, i, j));
+                            std::make_tuple(index_of_finite_element, i, j),
+                            basis_functions_type, basis_functions_element_type);
+
+            stiffness_matrix_local[j][i] = stiffness_matrix_local[i][j];
+            mass_matrix_local[j][i] = mass_matrix_local[i][j];
         }
     }
 
-#pragma unroll 4
+    const auto node_indexes =
+        finite_elements[index_of_finite_element].getNodeIndexes();
+
+    for (int i = 0; i < number_of_vertices_of_pyramid; i++) {
+        right_part_local[i] = 0.0;
+    }
+
     for (int i = 0; i < number_of_vertices_of_pyramid; i++) {
         right_part_local[i] = Integrator::integrateForRightPartVector(
-            nodes, finite_elements,
-            std::make_tuple(index_of_finite_element, i));
+            nodes, finite_elements, std::make_tuple(index_of_finite_element, i),
+            basis_functions_type, basis_functions_element_type);
     }
+
+    writeLocalComponentsToFiles(index_of_finite_element, stiffness_matrix_local,
+                                mass_matrix_local, right_part_local);
 }
 
 void FEM::assemblyGlobalComponents() {
@@ -335,8 +495,6 @@ void FEM::assemblyGlobalComponents() {
 }
 
 void FEM::solveFEM() {
-    saveGridForVisualize();
-
     generatePortrait();
 
     assemblyGlobalComponents();
@@ -344,59 +502,86 @@ void FEM::solveFEM() {
     slae.applyFirstBoundaryConditions(first_boundary_condition_nodes);
 
     slae.solveSLAE();
+
+    const auto slae_result = slae.getResultVector();
+
+    for (const auto result : slae_result) {
+        std::cout << result << '\n';
+    }
 }
 
-void FEM::checkBasisFunctionsToEqualsOne(
-    BASIS_TYPE basis_functions_type,
-    BASIS_ELEMENT_TYPE basis_functions_elements_type) {
-    bool is_all_basis_functions_good = true;
+void FEM::checkBasisFunctionsDeltaProperty() {
+    bool all_ok = true;
 
-    std::vector<int> wrong_basis_function_indexes;
+    struct Error {
+        std::size_t basis_function_index;
+        std::size_t node_index;
 
-    for (const auto& element : finite_elements) {
-        const auto node_indexes = element.getNodeIndexes();
+        double calculated_value;
+        double expected_value;
+    };
 
-#pragma unroll 4
-        for (int i = 0; i < number_of_vertices_of_pyramid; i++) {
-            const int current_pyramid_point = node_indexes.at(i);
-            if (MathUtils::getBasisFunction(nodes, nodes[node_indexes.at(i)],
-                                            node_indexes, basis_functions_type,
-                                            basis_functions_elements_type,
-                                            i) != 1.0) {
-                is_all_basis_functions_good = false;
+    for (std::size_t i = 0; i < finite_elements_count; ++i) {
+        const auto node_indexes = finite_elements[i].getNodeIndexes();
 
-                wrong_basis_function_indexes.push_back(i);
+        std::vector<Error> errors;
+
+        for (std::size_t j = 0; j < number_of_vertices_of_pyramid; ++j) {
+            const Point& test_node = nodes[node_indexes[j]];
+
+            double val_self = MathUtils::getBasisFunction(
+                nodes, test_node, node_indexes, basis_functions_type,
+                basis_functions_element_type, static_cast<int>(j), true);
+
+            if (std::abs(val_self - 1.0) > 1e-12) {
+                errors.push_back({j, j, val_self, 1.0});
+            }
+
+            for (std::size_t k = 0; k < number_of_vertices_of_pyramid; ++k) {
+                if (k == j) {
+                    continue;
+                }
+
+                const Point& other_node = nodes[node_indexes[k]];
+
+                double val_other = MathUtils::getBasisFunction(
+                    nodes, other_node, node_indexes, basis_functions_type,
+                    basis_functions_element_type, static_cast<int>(j), true);
+
+                if (std::abs(val_other) > 1e-12) {
+                    errors.push_back({j, k, val_other, 0.0});
+                }
             }
         }
 
-        if (!wrong_basis_function_indexes.empty()) {
-            std::cout << "Detected wrong basis function in element = {"
-                      << node_indexes.at(0) << ", " << node_indexes.at(1)
-                      << ", " << node_indexes.at(2) << ", "
-                      << node_indexes.at(3) << ", " << node_indexes.at(4)
-                      << "}\nat points = (";
+        if (!errors.empty()) {
+            all_ok = false;
 
-#pragma unroll 4
-            for (int i = 0; i < wrong_basis_function_indexes.size(); i++) {
-                std::cout << nodes[wrong_basis_function_indexes[i]].x << ", "
-                          << nodes[wrong_basis_function_indexes[i]].y << ", "
-                          << nodes[wrong_basis_function_indexes[i]].z << ")";
+            std::cout << "Element #" << i << " (nodes: ";
 
-                if (i != wrong_basis_function_indexes.size() - 1) {
-                    std::cout << ", ";
-                }
+            for (auto idx : node_indexes) {
+                std::cout << idx << ' ';
             }
 
+            std::cout << ")\n";
+
+            for (auto& err : errors) {
+                std::cout << "  Basis #" << err.basis_function_index
+                          << " at node idx " << node_indexes[err.node_index]
+                          << ": got " << err.calculated_value << ", expected "
+                          << err.expected_value << '\n';
+            }
             std::cout << '\n';
         }
     }
 
-    if (is_all_basis_functions_good) {
-        std::cout << "All basis functions are correct for all elements!\n";
+    if (all_ok) {
+        std::cout << "All basis functions passed the delta-property on all "
+                     "elements.\n";
     }
 }
 
-void FEM::saveTestResults(const std::vector<Point>& test_points) {
+void FEM::calculateResultAtPointsToFile(const std::vector<Point>& test_points) {
     int const first_column_step = 12;
     int const second_column_step = 15;
     int const third_column_step = 18;
@@ -432,7 +617,7 @@ void FEM::saveTestResults(const std::vector<Point>& test_points) {
     }
 }
 
-void FEM::saveGridForVisualize() {
+void FEM::writeGridInformationToFile() {
     int const nodes_out_step = 10;
     int const elements_out_step = 5;
 
@@ -453,12 +638,46 @@ void FEM::saveGridForVisualize() {
 #pragma unroll 4
         for (auto& element : finite_elements) {
             const auto node_indexes = element.getNodeIndexes();
-            out_elements << std::setw(elements_out_step) << node_indexes.at(0)
-                         << std::setw(elements_out_step) << node_indexes.at(1)
-                         << std::setw(elements_out_step) << node_indexes.at(2)
-                         << std::setw(elements_out_step) << node_indexes.at(3)
-                         << std::setw(elements_out_step) << node_indexes.at(4)
-                         << '\n';
+
+#pragma unroll 4
+            for (const auto index : node_indexes) {
+                out_elements << std::setw(elements_out_step) << index << " ";
+            }
+
+            out_elements << '\n';
         }
     }
+}
+
+void FEM::writeLocalComponentsToFiles(
+    int index_of_finite_element,
+    const std::vector<std::vector<double>>& stiffness_matrix,
+    const std::vector<std::vector<double>>& mass_matrix,
+    const std::vector<double>& right_part_vector) {
+    std::ofstream output_file("../data/output/test" +
+                              std::to_string(index_of_finite_element) + ".txt");
+
+    for (int i = 0; i < number_of_vertices_of_pyramid; ++i) {
+        for (int j = 0; j < number_of_vertices_of_pyramid; ++j) {
+            output_file << std::setw(20) << stiffness_matrix[i][j];
+        }
+        output_file << "\n";
+    }
+    output_file << "\n";
+
+    for (int i = 0; i < number_of_vertices_of_pyramid; ++i) {
+        for (int j = 0; j < number_of_vertices_of_pyramid; ++j) {
+            output_file << std::setw(20) << mass_matrix[i][j];
+        }
+        output_file << "\n";
+    }
+    output_file << "\n";
+
+    output_file << std::setprecision(12);
+
+    for (int i = 0; i < number_of_vertices_of_pyramid; ++i) {
+        output_file << std::setw(20) << right_part_vector[i];
+    }
+
+    output_file << "\n";
 }

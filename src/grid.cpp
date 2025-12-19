@@ -43,7 +43,13 @@ void Grid::generateGrid(const std::filesystem::path& input_file_name,
                     break;
             }
             break;
-
+        case BASIS_TYPE::Hierarhical:
+            switch (basis_functions_elements_type) {
+                case BASIS_ELEMENT_TYPE::Quadratic:
+                    generateQuadraticData();
+                    break;
+            }
+            break;
         default:
             generateLinearData();
             break;

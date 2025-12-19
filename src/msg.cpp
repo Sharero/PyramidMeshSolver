@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <cstddef>
+#include <iostream>
 #include <vector>
 
 void MSG::multiplyMatrixAndVector(const std::vector<double>& f_vector,
@@ -54,24 +55,38 @@ void MSG::calculateL(const std::vector<double>& f_vector,
 void MSG::makeLLTDecomposition() {
     double diagonal_sum = 0.0;
     double lower_triangle_sum = 0.0;
+    // for (int i = 0; i < 391; i++) {
+    //     // std::cout << i << " " << gg_of_lower_triangle[i] << '\n';
+    // }
+    // std::cout << 388 << " " << gg_of_lower_triangle[388] << '\n';
 
+    // std::cout << '\n' << gg_of_lower_triangle.size() << '\n';
     for (int k = 0; k < slae_size; k++) {
         diagonal_sum = 0;
 
         const int row_start_index = gi[k];
         const int row_end_index = gi[k + 1];
-
+        // std::cout << row_start_index << " " << row_end_index << "\n";
+        // std::cout << '\n';
         for (int i = row_start_index; i < row_end_index; i++) {
             lower_triangle_sum = 0;
 
             int column_start_index = gi[gj[i]];
             const int column_end_index = gi[gj[i] + 1];
-
+            // std::cout << column_start_index << " " << column_end_index <<
+            // "\n"; std::cout << '\n';
             for (int current_row_index = row_start_index; current_row_index < i;
                  current_row_index++) {
 #pragma unroll 4
                 for (int j = column_start_index; j < column_end_index; j++) {
+                    // std::cout << gj[current_row_index] << " " << gj[j] <<
+                    // "\n"; std::cout << '\n';
                     if (gj[current_row_index] == gj[j]) {
+                        // std::cout << gg_of_lower_triangle[current_row_index]
+                        //           << " " << gg_of_lower_triangle[j] << "\n";
+                        // std::cout << '\n';
+                        // std::cout << current_row_index << " " << j << "\n";
+                        // std::cout << '\n';
                         lower_triangle_sum +=
                             gg_of_lower_triangle[current_row_index] *
                             gg_of_lower_triangle[j];
@@ -79,14 +94,16 @@ void MSG::makeLLTDecomposition() {
                     }
                 }
             }
-
+            // std::cout << gj[i] << " " << di_of_lower_triangle[gj[i]] << "\n";
+            // std::cout << '\n';
             gg_of_lower_triangle[i] =
                 (gg_of_lower_triangle[i] - lower_triangle_sum) /
                 di_of_lower_triangle[gj[i]];
 
             diagonal_sum += gg_of_lower_triangle[i] * gg_of_lower_triangle[i];
         }
-
+        // std::cout << k << " " << diagonal_sum << "\n";
+        // std::cout << k << " " << di_of_lower_triangle[k] << "\n";
         di_of_lower_triangle[k] = sqrt(di_of_lower_triangle[k] - diagonal_sum);
     }
 }
@@ -103,17 +120,28 @@ void MSG::calculateSLAE(std::vector<double>& solution) {
     double scalar2 = 0.0;
     double betta = 0.0;
     double alpha = 0.0;
-
+    // for (auto elem : x0) {
+    //     std::cout << elem << '\n';
+    // }
     multiplyMatrixAndVector(x0, r);
-
+    // for (auto elem : r) {
+    //     std::cout << elem << '\n';
+    // }
+    // std::cout << '\n';
 #pragma unroll 4
     for (int i = 0; i < slae_size; i++) {
         r[i] = rp[i] - r[i];
     }
-
+    // for (auto elem : r) {
+    //     std::cout << elem << '\n';
+    // }
+    // std::cout << '\n';
     makeLLTDecomposition();
     calculateLLT(r, z);
-
+    // for (auto elem : di) {
+    //     std::cout << elem << '\n';
+    // }
+    // std::cout << '\n';
 #pragma unroll 4
     for (int i = 0; i < slae_size; i++) {
         p[i] = z[i];

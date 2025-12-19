@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <iostream>
 #include <set>
 #include <tuple>
 #include <utility>
@@ -50,6 +51,20 @@ void SLAE::addRightPartElement(int right_part_element_index,
 
 void SLAE::solveSLAE() {
     MSG msg(ig, di, jg, gg, slae_size, f);
+    // std::cout << ig.size() << " " << gg.size() << " " << jg.size() << '\n';
+    // for (auto elem : gg) {
+    //     std::cout << elem << '\n';
+    // }
+    // for (auto elem : di) {
+    //     std::cout << elem << '\n';
+    // }
+    // for (auto elem : f) {
+    //     std::cout << elem << '\n';
+    // }
+    // for (auto elem : jg) {
+    //     std::cout << elem << ' ';
+    // }
+    // std::cout <<'\n'<< '\n';
     msg.calculateSLAE(q);
 }
 

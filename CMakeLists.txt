@@ -2,7 +2,10 @@ cmake_minimum_required(VERSION 3.10)
 
 project(test)
 
+include_directories(third_party/boost third_party/autodiff)
+
 add_executable(my_app src/main.cpp src/grid.cpp src/fem.cpp src/slae.cpp src/msg.cpp src/mathUtils.cpp src/integrator.cpp)
+# add_executable(my_app src/ff.cpp)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 

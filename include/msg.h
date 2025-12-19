@@ -42,21 +42,21 @@ class MSG {
           rp(rp_s),
           slae_size(n_s) {
         x0.resize(slae_size, 0);
-        r.resize(slae_size);
-        z.resize(slae_size);
-        p.resize(slae_size);
-        s.resize(slae_size);
+        r.resize(slae_size, 0);
+        z.resize(slae_size, 0);
+        p.resize(slae_size, 0);
+        s.resize(slae_size, 0);
 
-        di_of_lower_triangle.resize(slae_size);
-        gg_of_lower_triangle.resize(gi.at(slae_size));
+        di_of_lower_triangle.resize(di_s.size(), 0);
+        gg_of_lower_triangle.resize(gg_s.size(), 0);
 
 #pragma unroll 4
-        for (int i = 0; i < slae_size; i++) {
+        for (int i = 0; i < di_s.size(); i++) {
             di_of_lower_triangle[i] = di[i];
         }
 
 #pragma unroll 4
-        for (int i = 0; i < gi[slae_size]; i++) {
+        for (int i = 0; i < gg_s.size(); i++) {
             gg_of_lower_triangle[i] = gg[i];
         }
     }
